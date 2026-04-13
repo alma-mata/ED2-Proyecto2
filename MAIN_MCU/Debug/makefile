@@ -64,8 +64,8 @@ all: main-build
 main-build: MAIN_MCU.elf secondary-outputs
 
 # Tool invocations
-MAIN_MCU.elf MAIN_MCU.map: $(OBJS) $(USER_OBJS) D:\Users\alma\STM32CubeIDE\workspace_2.1.0\MAIN_MCU\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "MAIN_MCU.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\Users\alma\STM32CubeIDE\workspace_2.1.0\MAIN_MCU\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="MAIN_MCU.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+MAIN_MCU.elf MAIN_MCU.map: $(OBJS) $(USER_OBJS) D:\Documents\GitHub\ED2-Proyecto2\MAIN_MCU\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "MAIN_MCU.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\Documents\GitHub\ED2-Proyecto2\MAIN_MCU\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="MAIN_MCU.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

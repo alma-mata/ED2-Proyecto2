@@ -22,10 +22,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "ili9341.h"
-#include "Bitmaps.h"
 #include "string.h"
 #include "stdio.h"
+#include "ili9341.h"
+#include "Bitmaps.h"
+#include "fatfs_sd.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,6 +36,14 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+SPI_HandleTypeDef hspi1;
+FATFS fs;
+FATFS *pfs;
+FIL fil;
+FRESULT fres;
+DWORD fre_clust;
+uint32_t totalSpace, freeSpace;
+char buffer[100];
 
 /* USER CODE END PD */
 
@@ -141,15 +150,15 @@ int main(void)
 //	LCD_Print("Hola Mundo", 20, 150, 2, 0x001F, 0x055b);
 //
 //
-	for (int x = 0; x < 319; x++) {
-			LCD_Bitmap(x, 116, 15, 15, tile);
-			LCD_Bitmap(x, 68, 15, 15, tile);
-			LCD_Bitmap(x, 207, 15, 15, tile);
-			LCD_Bitmap(x, 223, 15, 15, tile);
-			x += 14;
-		}
-
-	LCD_BitmapTransparent(100, 116-36, 49, 36, dkong, 0x4b7e);
+//	for (int x = 0; x < 319; x++) {
+//			LCD_Bitmap(x, 116, 15, 15, tile);
+//			LCD_Bitmap(x, 68, 15, 15, tile);
+//			LCD_Bitmap(x, 207, 15, 15, tile);
+//			LCD_Bitmap(x, 223, 15, 15, tile);
+//			x += 14;
+//		}
+//
+//	LCD_BitmapTransparent(100, 116-36, 49, 36, dkong, 0x4b7e);
 	//LCD_Sprite(int x, int y, int width, int height, unsigned char bitmap[], int columns, int index, char flip, char offset);
 
 	//LCD_Sprite(100, 116-29, 42, 29, link, 4, 0, 0, 0);
@@ -162,8 +171,9 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	while (1) {
-		HAL_I2C_Master_Receive_IT(&hi2c1, ESP32_ADDR, &rxData, 1);
-		HAL_Delay(500);
+		// COMUNICACION I2C con control 1
+//		HAL_I2C_Master_Receive_IT(&hi2c1, ESP32_ADDR, &rxData, 1);
+//		HAL_Delay(500);
 
 
     /* USER CODE END WHILE */
