@@ -36,11 +36,13 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define BUFFER_PIXELS 320
+
 FATFS fs;
 FATFS *pfs;
 FIL fil;
 FRESULT fres;
-
+UINT br;
 DWORD fre_clust;
 uint32_t totalSpace, freeSpace;
 char buffer[100];
@@ -123,6 +125,30 @@ void unmount_SD() {
 		transmit_uart("Micro SD card was not unmounted!\r\n");
 	}
 }
+
+void drawImageSD_Chunked (char *filename, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
+	uint16_t buffer[BUFFER_PIXELS];
+
+	mount_SD();
+	open_ReadFile(filename);
+
+	for (uint16_t row = 0; row < height; row++) {
+		// Leer una fila completa
+		f_read(&fil, buffer, width * sizeof(uint16_t), &br);
+
+		if (br != width * sizeof(uint16_t)) {
+			transmit_uart("Read error\n");
+			break;
+		}
+
+		// Dibujar SOLO esa fila
+		//LCD_Bitmap(x, y + row, width, 1, buffer);
+		LCD_BitmapTransparent(x, y + row, width, 1, buffer, 0x0000);
+	}
+
+	close_File(filename);
+	unmount_SD();
+}
 /* USER CODE END 0 */
 
 /**
@@ -164,24 +190,17 @@ int main(void)
 
 	LCD_Clear(0x00);
 
+	drawImageSD_Chunked("load_screen.bin", 0, 0, 320, 240);
 	// PRUEBA - MICRO SD
-//	uint16_t fondo[76800];  // ajusta el tamaño según tu imagen
-//	uint16_t index = 0;
-//	char *token;
-
-	mount_SD();
-	open_ReadFile("load_screen.txt");
+//	mount_SD();
+//	open_ReadFile("load_screen.txt");
 //	while (f_gets(buffer, sizeof(buffer), &fil)) {
-//
-//	    token = strtok(buffer, ",");
-//
-//	    while (token != NULL) {
-//	        fondo[index++] = (uint16_t) strtol(token, NULL, 0);
-//	        token = strtok(NULL, ",");
-//	    }
+//		char mRd [100];
+//		sprintf(mRd, "%s", buffer);
+//		transmit_uart(mRd);
 //	}
-	close_File("load_screen.txt");
-	unmount_SD();
+//	close_File("load_screen.txt");
+//	unmount_SD();
 
 	//FillRect(unsigned int x, unsigned int y, unsigned int w, unsigned int h, unsigned int c);
 	//FillRect(0, 0, 319, 239, 0x0DFE);
@@ -240,14 +259,14 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 //
-				for (int x = 0; x < 319-42; x++) {
-					int anim = (x/10)%4;
-					// anim 0 1 2 3
-					LCD_Sprite(x, 116-29, 42, 29, link, 4, anim, 0, 0);
-					//V_line( x -1, 100, 50, 0x0DFE);
-					HAL_Delay(15);
-
-				}
+//				for (int x = 0; x < 319-42; x++) {
+//					int anim = (x/10)%4;
+//					// anim 0 1 2 3
+//					LCD_Sprite(x, 116-29, 42, 29, link, 4, anim, 0, 0);
+//					//V_line( x -1, 100, 50, 0x0DFE);
+//					HAL_Delay(15);
+//
+//				}
 //				for (int var = 319-24; var > 0;  var--) {
 //					int anim = (var / 10) % 4;
 //					LCD_Sprite(var, 100, 24, 30, sonics, 4, anim, 1, 0);

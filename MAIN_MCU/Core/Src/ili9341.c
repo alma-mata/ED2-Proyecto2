@@ -60,7 +60,7 @@ extern const uint8_t smallFont[1140];
 extern const uint16_t bigFont[1520];
 
 // Definir color transparente (ejemplo: magenta 0xF81F)
-#define TRANSPARENT_COLOR 0xF81F
+#define TRANSPARENT_COLOR 0x0000
 
 typedef struct {
 	const uint16_t *bitmap;
