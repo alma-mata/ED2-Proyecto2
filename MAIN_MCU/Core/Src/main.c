@@ -36,11 +36,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-SPI_HandleTypeDef hspi1;
 FATFS fs;
 FATFS *pfs;
 FIL fil;
 FRESULT fres;
+
 DWORD fre_clust;
 uint32_t totalSpace, freeSpace;
 char buffer[100];
@@ -83,7 +83,46 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void transmit_uart(char *string) {
+	uint8_t len = strlen(string);
+	HAL_UART_Transmit(&huart2, (uint8_t*) string, len, 200);
+}
 
+void mount_SD(){
+	fres = f_mount(&fs, "/", 0);
+	if (fres == FR_OK) {
+		transmit_uart("Micro SD card is mounted succesfully!\r\n");
+	} else if (fres != FR_OK) {
+		transmit_uart("Micro SD card's mounted error!\r\n");
+	}
+}
+
+void open_ReadFile(char *filename) {
+	fres = f_open(&fil, filename, FA_READ);
+	if (fres == FR_OK) {
+		transmit_uart("File opened for reading.\r\n");
+	} else if (fres != FR_OK) {
+		transmit_uart("File was not opened for reading.\r\n");
+	}
+}
+
+void close_File(char *filename) {
+	fres = f_close(&fil);
+	if (fres == FR_OK) {
+		transmit_uart("The file is closed.\r\n");
+	} else if (fres != FR_OK) {
+		transmit_uart("The file was not closed.\r\n");
+	}
+}
+
+void unmount_SD() {
+	f_mount(NULL, "", 1);
+	if (fres == FR_OK) {
+		transmit_uart("Micro SD card is unmounted!\r\n");
+	} else if (fres != FR_OK) {
+		transmit_uart("Micro SD card was not unmounted!\r\n");
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -124,6 +163,26 @@ int main(void)
 	LCD_Init();
 
 	LCD_Clear(0x00);
+
+	// PRUEBA - MICRO SD
+//	uint16_t fondo[76800];  // ajusta el tamaño según tu imagen
+//	uint16_t index = 0;
+//	char *token;
+
+	mount_SD();
+	open_ReadFile("load_screen.txt");
+//	while (f_gets(buffer, sizeof(buffer), &fil)) {
+//
+//	    token = strtok(buffer, ",");
+//
+//	    while (token != NULL) {
+//	        fondo[index++] = (uint16_t) strtol(token, NULL, 0);
+//	        token = strtok(NULL, ",");
+//	    }
+//	}
+	close_File("load_screen.txt");
+	unmount_SD();
+
 	//FillRect(unsigned int x, unsigned int y, unsigned int w, unsigned int h, unsigned int c);
 	//FillRect(0, 0, 319, 239, 0x0DFE);
 	//FillRect(0, 0, 319, 239, 0x4c9d);
@@ -181,14 +240,14 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 //
-//				for (int x = 0; x < 319-42; x++) {
-//					int anim = (x/10)%4;
-//					// anim 0 1 2 3
-//					LCD_Sprite(x, 116-29, 42, 29, link, 4, anim, 0, 0);
-//					//V_line( x -1, 100, 50, 0x0DFE);
-//					HAL_Delay(15);
-//
-//				}
+				for (int x = 0; x < 319-42; x++) {
+					int anim = (x/10)%4;
+					// anim 0 1 2 3
+					LCD_Sprite(x, 116-29, 42, 29, link, 4, anim, 0, 0);
+					//V_line( x -1, 100, 50, 0x0DFE);
+					HAL_Delay(15);
+
+				}
 //				for (int var = 319-24; var > 0;  var--) {
 //					int anim = (var / 10) % 4;
 //					LCD_Sprite(var, 100, 24, 30, sonics, 4, anim, 1, 0);
