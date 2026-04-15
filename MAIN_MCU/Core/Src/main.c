@@ -129,7 +129,7 @@ void unmount_SD() {
 void drawImageSD_Chunked (char *filename, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
 	uint16_t buffer[BUFFER_PIXELS];
 
-	mount_SD();
+	//mount_SD();
 	open_ReadFile(filename);
 
 	for (uint16_t row = 0; row < height; row++) {
@@ -142,12 +142,11 @@ void drawImageSD_Chunked (char *filename, uint16_t x, uint16_t y, uint16_t width
 		}
 
 		// Dibujar SOLO esa fila
-		//LCD_Bitmap(x, y + row, width, 1, buffer);
-		LCD_BitmapTransparent(x, y + row, width, 1, buffer, 0x0000);
+		LCD_Bitmap(x, y + row, width, 1, buffer);
 	}
 
 	close_File(filename);
-	unmount_SD();
+	//unmount_SD();
 }
 /* USER CODE END 0 */
 
@@ -190,17 +189,18 @@ int main(void)
 
 	LCD_Clear(0x00);
 
+	mount_SD();
 	drawImageSD_Chunked("load_screen.bin", 0, 0, 320, 240);
-	// PRUEBA - MICRO SD
-//	mount_SD();
-//	open_ReadFile("load_screen.txt");
-//	while (f_gets(buffer, sizeof(buffer), &fil)) {
-//		char mRd [100];
-//		sprintf(mRd, "%s", buffer);
-//		transmit_uart(mRd);
-//	}
-//	close_File("load_screen.txt");
-//	unmount_SD();
+	HAL_Delay(1000);
+	drawImageSD_Chunked("Lv1A_1-0.bin", 0, 0, 320, 240);
+	drawImageSD_Chunked("Lv1A_1-1.bin", 0, 0, 320, 240);
+	drawImageSD_Chunked("Lv1A_1-2.bin", 0, 0, 320, 240);
+	drawImageSD_Chunked("Lv1A_1-3.bin", 0, 0, 320, 240);
+	drawImageSD_Chunked("Lv1A_1-4.bin", 0, 0, 320, 240);
+	drawImageSD_Chunked("Lv1A_1-5.bin", 0, 0, 320, 240);
+	drawImageSD_Chunked("Lv1A_1-6.bin", 0, 0, 320, 240);
+	drawImageSD_Chunked("Lv1A_1-7.bin", 0, 0, 320, 240);
+	unmount_SD();
 
 	//FillRect(unsigned int x, unsigned int y, unsigned int w, unsigned int h, unsigned int c);
 	//FillRect(0, 0, 319, 239, 0x0DFE);
@@ -259,14 +259,15 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 //
-//				for (int x = 0; x < 319-42; x++) {
-//					int anim = (x/10)%4;
-//					// anim 0 1 2 3
-//					LCD_Sprite(x, 116-29, 42, 29, link, 4, anim, 0, 0);
-//					//V_line( x -1, 100, 50, 0x0DFE);
-//					HAL_Delay(15);
-//
-//				}
+				for (int x = 0; x < 239-16; x++) {
+					int anim = (x/10)%4;
+					// anim 0 1 2 3
+					LCD_Sprite(310-16, 220-x, 16, 16, mario_walk, 5, anim, 0, 0);
+					LCD_Sprite(310-16, 220-x, 16, 16, dkong, 3, anim, 0, 0);
+					//V_line( x -1, 100, 50, 0x0DFE);
+					HAL_Delay(15);
+
+				}
 //				for (int var = 319-24; var > 0;  var--) {
 //					int anim = (var / 10) % 4;
 //					LCD_Sprite(var, 100, 24, 30, sonics, 4, anim, 1, 0);
