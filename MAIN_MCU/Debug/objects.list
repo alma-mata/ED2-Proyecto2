@@ -1,4 +1,5 @@
 "./Core/Src/fatfs_sd.o"
+"./Core/Src/fisicas.o"
 "./Core/Src/font.o"
 "./Core/Src/graficos.o"
 "./Core/Src/ili9341.o"
