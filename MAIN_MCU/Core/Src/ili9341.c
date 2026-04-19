@@ -59,8 +59,8 @@ static const uint32_t DATA_PC = LCD_D1_Pin;
 extern const uint8_t smallFont[1140];
 extern const uint16_t bigFont[1520];
 
-// Definir color transparente (ejemplo: magenta 0xF81F)
-#define TRANSPARENT_COLOR 0x0001
+// Definir color transparente
+#define TRANSPARENT_COLOR 0xF81F
 
 typedef struct {
 	const uint16_t *bitmap;
@@ -70,7 +70,7 @@ typedef struct {
 } TransparentBitmap;
 
 //***************************************************************************************************************************************
-// Función para inicializar tabla para pines
+// Función para iniciar tabla para pines
 //***************************************************************************************************************************************
 void initLookup() {
 	for (int val = 0; val < 256; val++) {
@@ -161,7 +161,7 @@ void LCD_Init(void) {
 	LCD_DATA(0x08);
 	//****************************************
 	LCD_CMD(0x36);  // (MEMORYACCESS)
-	LCD_DATA(0x40 | 0x80 | 0x20 | 0x08); // LCD_DATA(0x19);
+	LCD_DATA(0x80 | 0x40 | 0x08); // LCD_DATA(0x19);
 	//****************************************
 	LCD_CMD(0x3A); // Set_pixel_format (PIXELFORMAT)
 	LCD_DATA(0x05); // color setings, 05h - 16bit pixel, 11h - 3bit pixel
@@ -204,17 +204,17 @@ void LCD_Init(void) {
 	LCD_DATA(0x80);
 	LCD_DATA(0x00);
 	//****************************************
-	LCD_CMD(0x2A); // Set_column_address 320px (CASET)
+	LCD_CMD(0x2A); // CASET
 	LCD_DATA(0x00);
 	LCD_DATA(0x00);
-	LCD_DATA(0x01);
-	LCD_DATA(0x3F);
+	LCD_DATA(0x00); // Antes era 0x01
+	LCD_DATA(0xEF); // 239 (Ancho 240)
 	//****************************************
-	LCD_CMD(0x2B); // Set_page_address 240px (PASET)
+	LCD_CMD(0x2B); // PASET
 	LCD_DATA(0x00);
 	LCD_DATA(0x00);
-	LCD_DATA(0x00);
-	LCD_DATA(0xF0);
+	LCD_DATA(0x01); // Antes era 0x00
+	LCD_DATA(0x3F); // 319 (Alto 320)
 	//LCD_DATA(0x01);
 	//LCD_DATA(0xE0);
 	//  LCD_DATA(0x8F);
@@ -234,9 +234,9 @@ void LCD_Init(void) {
 void LCD_CMD(uint8_t cmd) {
 	LCD_RS_L();
 	LCD_WR_L();
-	GPIOA->BSRR |= busLookup[cmd].bsrrA;
-	GPIOB->BSRR |= busLookup[cmd].bsrrB;
-	GPIOC->BSRR |= busLookup[cmd].bsrrC;
+	GPIOA->BSRR = busLookup[cmd].bsrrA;
+	GPIOB->BSRR = busLookup[cmd].bsrrB;
+	GPIOC->BSRR = busLookup[cmd].bsrrC;
 	LCD_WR_H();
 }
 //***************************************************************************************************************************************
@@ -245,9 +245,9 @@ void LCD_CMD(uint8_t cmd) {
 void LCD_DATA(uint8_t data) {
 	LCD_RS_H();
 	LCD_WR_L();
-	GPIOA->BSRR |= busLookup[data].bsrrA;
-	GPIOB->BSRR |= busLookup[data].bsrrB;
-	GPIOC->BSRR |= busLookup[data].bsrrC;
+	GPIOA->BSRR = busLookup[data].bsrrA;
+	GPIOB->BSRR = busLookup[data].bsrrB;
+	GPIOC->BSRR = busLookup[data].bsrrC;
 	LCD_WR_H();
 }
 //***************************************************************************************************************************************
@@ -277,9 +277,9 @@ void LCD_Clear(unsigned int c) {
 	//HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_RESET);
 	LCD_RS_H();
 	LCD_CS_L();
-	SetWindows(0, 0, 319, 239); // 479, 319);
-	for (x = 0; x < 320; x++)
-		for (y = 0; y < 240; y++) {
+	SetWindows(0, 0, 239, 319); // Antes era 319, 239
+	for (x = 0; x < 240; x++)    // Antes era 320
+	    for (y = 0; y < 320; y++) { // Antes era 240
 			LCD_DATA(c >> 8);
 			LCD_DATA(c);
 		}
