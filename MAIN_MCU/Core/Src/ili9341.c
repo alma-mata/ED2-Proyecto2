@@ -161,7 +161,7 @@ void LCD_Init(void) {
 	LCD_DATA(0x08);
 	//****************************************
 	LCD_CMD(0x36);  // (MEMORYACCESS)
-	LCD_DATA(0x80 | 0x40 | 0x08); // LCD_DATA(0x19);
+	LCD_DATA(0x80 | 0x08); // LCD_DATA(0x19);
 	//****************************************
 	LCD_CMD(0x3A); // Set_pixel_format (PIXELFORMAT)
 	LCD_DATA(0x05); // color setings, 05h - 16bit pixel, 11h - 3bit pixel
