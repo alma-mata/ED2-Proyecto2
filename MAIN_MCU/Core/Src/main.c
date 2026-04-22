@@ -81,6 +81,10 @@ uint8_t prevVidas[NUM_JUGADORES];
 // Flag para saber si ya se pinto la pantalla de cada estado
 uint8_t estadoPintado = 0;
 volatile uint8_t anim_flag = 0; 	// Banderas de animación y movimiento
+uint8_t frame_start = 0; 		// Frame de la animacion start
+uint8_t mario_ready = 0; 		// Bandera para mario listo
+uint8_t luigi_ready = 0; 		// Bandera para luigi listo
+volatile uint8_t numFrame = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -124,7 +128,7 @@ void unmount_SD()                 {
 /* ---------- FONDOS Y ANIMACIONES ---------- */
 void drawImageSD_Chunked (char *filename, uint16_t x, uint16_t y,
 		uint16_t width, uint16_t height, uint8_t total_frames) {
-
+	HAL_TIM_Base_Stop_IT(&htim6);
 	uint16_t chunk = 10;
 	uint16_t buffer[BUFFER_PIXELS*chunk];
 
@@ -141,6 +145,7 @@ void drawImageSD_Chunked (char *filename, uint16_t x, uint16_t y,
 	}
 	close_File(filename);
 	unmount_SD();
+	HAL_TIM_Base_Start_IT(&htim6);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
@@ -148,11 +153,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (htim->Instance == TIM6)
     {
     	anim_flag = 1;
-//    	if (mario_x < 240 && mario_flip == 0) 		mario_x++;
-//    	else if (mario_x > 0 && mario_flip == 1) 	mario_x--;
-//    	else if (mario_flip == 0) 	mario_flip = 1;
-//    	else if (mario_flip == 1) 	mario_flip = 0;
+    	numFrame++;
     }
+}
+
+void makeScore(void) {
+	// Proceso para determinar el score de cada uno
+	drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
 }
 /* ---------- HUD ---------- */
 
@@ -410,8 +417,8 @@ int main(void)
     LCD_Init();
     LCD_Clear(0x0000);
 
-//    mount_SD();
-//    unmount_SD();
+    mount_SD();
+    unmount_SD();
 
     // Debug I2C
     char pinDbg[60];
@@ -435,20 +442,22 @@ int main(void)
     // Pantalla de reposo
     drawImageSD_Chunked("load_screen.bin", 0, 0, 240, 320, 1);
     HAL_Delay(1000);
-    // Menu de inicio
-    drawImageSD_Chunked("start_menu.bin", 0, 0, 240, 320, 1);
-
-    HAL_Delay(1000);
-    // Animacion inicial
-    drawImageSD_Chunked("start_animation.bin", 0, 0, 240, 320, 22);
-    HAL_Delay(1000);
+    // Menu de inicio (ya en switch case)
+//    drawImageSD_Chunked("start_menu.bin", 0, 0, 240, 320, 1);
+//    LCD_Sprite(100, 100, 37, 7, mario_start, 1, 0, 0, 0);
+//    HAL_Delay(1000);
+//    // Animacion inicial
+//    drawImageSD_Chunked("start_animation.bin", 0, 0, 240, 320, 22);
+//    HAL_Delay(1000);
 //    // Secuencia WIN
 //    drawImageSD_Chunked("win.bin", 0, 0, 240, 320, 8);
 //    drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
+//    HAL_Delay(1000);
 //
 //    // Secuencia Game Over
 //    drawImageSD_Chunked("game_over.bin", 0, 0, 240, 320, 9);
-    drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
+//    drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
+//    HAL_Delay(1000);
 
   /* USER CODE END 2 */
 
@@ -465,10 +474,37 @@ int main(void)
               if (fres == FR_OK) {
                   hspi1.Instance->CR1 &= ~SPI_BAUDRATEPRESCALER_256;
                   hspi1.Instance->CR1 |= SPI_BAUDRATEPRESCALER_2;
-                  drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
+                  drawImageSD_Chunked("start_menu.bin", 0, 0, 240, 320, 1);
+                  LCD_Sprite(146, 188, 39, 7, mario_start, 2, frame_start, 0, 0);
+                  LCD_Sprite(146, 233, 39, 7, luigi_start, 2, frame_start, 0, 0);
               }
               transmit_uart("Estado: START - esperando P\r\n");
               estadoPintado = 1;
+          }
+          // Animacion de los botones
+          if (anim_flag) {
+        	  // ----- PRUEBA SPRITES ---------
+//        	  frame_start = (numFrame/2)%5;
+//        	  LCD_Sprite(10, 220, 18, 18, mario, 5, frame_start, 0, 0);
+//        	  LCD_Sprite(40, 220, 18, 18, luigi, 5, frame_start, 0, 0);
+//        	  LCD_Sprite(50, 150, 18, 18, mario_death, 5, frame_start, 0, 0);
+//        	  LCD_Sprite(80, 150, 18, 18, luigi_death, 5, frame_start, 0, 0);
+//
+//        	  frame_start = (numFrame/2)%7;
+//        	  LCD_Sprite(200, 200, 18, 18, mario_stairs, 7, frame_start, 0, 0);
+//        	  LCD_Sprite(220, 200, 18, 18, luigi_stairs, 7, frame_start, 0, 0);
+
+        	  // ---------- Animacion MENU START
+        	  frame_start = (numFrame/2)%2; 	//XOR
+        	  LCD_Sprite(76, 130, 88, 7, insert_coin, 2, frame_start, 0, 0);
+        	  frame_start = (numFrame/2)%4;
+        	  LCD_Sprite(111, 33, 18, 24, peach, 4, frame_start, 0, 0);
+        	  // ------ CONDICIÓN DE PARPADEO ---------
+        	  if (mario_ready) LCD_Sprite(146, 188, 39, 7, mario_start, 2, 0, 0, 0);
+        	  else LCD_Sprite(146, 188, 39, 7, mario_start, 2, frame_start, 0, 0);
+
+        	  if (luigi_ready) LCD_Sprite(146, 233, 39, 7, luigi_start, 2, 0, 0, 0);
+        	  else LCD_Sprite(146, 233, 39, 7, luigi_start, 2, frame_start, 0, 0);
           }
           // Esperar comando 'P' para iniciar
           if (checarComandoPlay()) {
