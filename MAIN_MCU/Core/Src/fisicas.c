@@ -15,37 +15,40 @@ Controles_t controles[NUM_JUGADORES];
 uint16_t    barrilSpawnTimer = 0;
 EstadoJuego_t estadoJuego = ESTADO_START;
 
+uint8_t dkTirando = 0;
+uint8_t ganadorID = 0;
+
 const uint8_t tilemap[20][30] = {
-    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,2,0,0,0,0,0 },
-    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,2,0,0,0,0,0 },
-    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,2,0,0,0,0,0 },
-    { 0,0,0,0,0,0,0,0,0,0,0,1,3,1,1,1,1,1,0,0,0,0,2,0,2,0,0,0,0,0 },
-    { 0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,2,0,2,0,0,0,0,0 },
-    { 0,0,0,0,0,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 },
-    { 0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
-    { 0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
-    { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,1,0,0,0,0 },
+    { 0,0,0,0,0,2,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+    { 0,0,0,0,0,2,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+    { 0,0,0,0,0,2,0,2,0,0,0,0,1,1,1,1,1,3,1,0,0,0,0,0,0,0,0,0,0,0 },
+    { 0,0,0,0,0,2,0,2,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0 },
+    { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,0,0,0,0,0 },
     { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0 },
+    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0 },
+    { 0,0,0,0,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 },
+    { 0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
     { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
-    { 0,0,0,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 },
-    { 0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
-    { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,0,0,0,0,0 },
-    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0 },
-    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0 },
-    { 0,0,0,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 },
-    { 0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
-    { 1,1,1,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
-    { 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 }
+    { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,0,0,0 },
+    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0 },
+    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0},
+    { 0,0,0,0,0,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 },
+    { 0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+    { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,0,0,0 },
+    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0 },
+    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 },
+    { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 }
 };
 
 /* ========================== MAPA ========================== */
 
 int16_t calcularOffsetInclinacion(uint8_t row, uint8_t col) {
     if (row >= 18 || row <= 3) return 0;
-    if (row >= 15 && row <= 17) return -(col / 4);
-    if (row >= 12 && row <= 14) return  (col / 4);
-    if (row >= 9  && row <= 11) return -(col / 4);
-    if (row >= 6  && row <= 8)  return  (col / 4);
+    if (row >= 15 && row <= 17) return  (col / 4);
+    if (row >= 12 && row <= 14) return -(col / 4);
+    if (row >= 9  && row <= 11) return  (col / 4);
+    if (row >= 6  && row <= 8)  return -(col / 4);
     return 0;
 }
 
@@ -95,6 +98,8 @@ void Fisicas_Init(void)
     memset(controles, 0, sizeof(controles));
     memset(enemigos,  0, sizeof(enemigos));
     barrilSpawnTimer = 0;
+    dkTirando = 0;
+    ganadorID = 0;
 
     jugadores[J_MARIO].x         = PX_TO_FP(20);
     jugadores[J_MARIO].y         = PX_TO_FP(FILA_PISO_BAJO * TILE_H - SPRITE_H);
@@ -105,6 +110,8 @@ void Fisicas_Init(void)
     jugadores[J_MARIO].vidas     = NUM_VIDAS;
     jugadores[J_MARIO].invencible = 0;
     jugadores[J_MARIO].id        = J_MARIO;
+    jugadores[J_MARIO].muriendo  = 0;
+    jugadores[J_MARIO].frameAnimMuerte = 0;
 
     jugadores[J_LUIGI].x         = PX_TO_FP(50);
     jugadores[J_LUIGI].y         = PX_TO_FP(FILA_PISO_BAJO * TILE_H - SPRITE_H);
@@ -115,6 +122,8 @@ void Fisicas_Init(void)
     jugadores[J_LUIGI].vidas     = NUM_VIDAS;
     jugadores[J_LUIGI].invencible = 0;
     jugadores[J_LUIGI].id        = J_LUIGI;
+    jugadores[J_LUIGI].muriendo  = 0;
+    jugadores[J_LUIGI].frameAnimMuerte = 0;
 }
 
 /* ========================== FISICA JUGADOR ========================== */
@@ -182,10 +191,16 @@ void manejarEscalera(Jugador_t *j, Controles_t *ctrl) {
         j->velY = 0; j->velX = 0;
         if (ctrl->arriba) j->y -= VEL_ESCALERA;
         if (ctrl->abajo)  j->y += VEL_ESCALERA;
-        if (!esEscalera(centroX, FP_TO_PX(j->y) + j->h - 2))
+        if (!esEscalera(centroX, FP_TO_PX(j->y) + j->h - 2)) {
             j->enEscalera = 0;
+            j->frameAnim = 0;
+            j->contadorAnim = 0;
+        }
         if (ctrl->salto) {
-            j->enEscalera = 0; j->velY = VEL_SALTO; j->saltando = 1;
+            j->enEscalera = 0;
+            j->frameAnim = 0;
+            j->contadorAnim = 0;
+            j->velY = VEL_SALTO; j->saltando = 1;
         }
     }
 }
@@ -199,14 +214,11 @@ void iniciarEnemigo(uint8_t idx, int16_t px, int16_t py, uint8_t radio,
     Enemigo_t *e = &enemigos[idx];
     e->x = PX_TO_FP(px);  e->y = PX_TO_FP(py);
     e->radio = radio;  e->w = w;  e->h = h;
-    e->tipo = tipo;  e->activo = 1;  e->direccion = -1;
+    e->tipo = tipo;  e->activo = 1;
+    e->direccion = 1;
     e->velX = PX_TO_FP(1);  e->velY = 0;
 }
 
-/*
- * Spawn un barril desde la izquierda, plataforma row 5.
- * Solo spawna si hay slots libres.
- */
 void spawnBarril(void) {
     for (uint8_t i = 0; i < MAX_ENEMIGOS; i++) {
         if (!enemigos[i].activo) {
@@ -216,29 +228,21 @@ void spawnBarril(void) {
             spawnY += offset;
             iniciarEnemigo(i, spawnX, spawnY, BARRIL_RADIO,
                           BARRIL_W, BARRIL_H, 0);
-            break;  // solo 1 por llamada
+            dkTirando = DK_THROW_FRAMES;
+            break;
         }
     }
 }
 
-/*
- * Barriles: gravedad, colision con plataformas, rebote en bordes.
- * NUEVO: si el barril llega al piso inferior (row 19), se DESACTIVA
- *        para ser reciclado por el spawner.
- */
 void actualizarEnemigos(void) {
     for (uint8_t i = 0; i < MAX_ENEMIGOS; i++) {
         Enemigo_t *e = &enemigos[i];
         if (!e->activo) continue;
 
-        // Gravedad
         e->velY += GRAVEDAD;
         if (e->velY > VEL_Y_MAX) e->velY = VEL_Y_MAX;
-
-        // Movimiento horizontal
         e->x += e->velX * e->direccion;
 
-        // Colision vertical
         int16_t px = FP_TO_PX(e->x);
         int16_t pieIzq   = px + 2;
         int16_t pieDer   = px + e->w - 3;
@@ -253,7 +257,6 @@ void actualizarEnemigos(void) {
             e->y = PX_TO_FP(suelo - e->h);
             e->velY = 0;
 
-            // === RECICLAR: si llego al piso inferior, desactivar ===
             int16_t pieRow = suelo / TILE_H;
             if (pieRow >= FILA_PISO_BAJO) {
                 e->activo = 0;
@@ -263,7 +266,6 @@ void actualizarEnemigos(void) {
             e->y += e->velY;
         }
 
-        // Rebote en bordes
         px = FP_TO_PX(e->x);
         if (px <= 0) {
             e->x = PX_TO_FP(1);
@@ -287,33 +289,29 @@ uint8_t colisionRadial(Jugador_t *j, Enemigo_t *e) {
 }
 
 /* ========================== CONTROLES UART ========================== */
-// Llamamos a las variables que están en el main.c
 extern volatile uint8_t estado_J1;
 extern volatile uint8_t estado_J2;
 
 void leerControles2P(void)
 {
-    // Limpiamos pulsaciones de este frame
     memset(controles, 0, sizeof(controles));
 
-    // --- JUGADOR 1 (Mario) ---
     switch (estado_J1) {
         case 'R': controles[J_MARIO].derecha   = 1; break;
         case 'L': controles[J_MARIO].izquierda = 1; break;
         case 'U': controles[J_MARIO].arriba    = 1; break;
         case 'D': controles[J_MARIO].abajo     = 1; break;
         case 'A': controles[J_MARIO].salto     = 1; break;
-        case 'N': break; // Si manda N, no hace nada (se queda quieto)
+        case 'N': break;
     }
 
-    // --- JUGADOR 2 (Luigi) ---
     switch (estado_J2) {
         case 'r': controles[J_LUIGI].derecha   = 1; break;
         case 'l': controles[J_LUIGI].izquierda = 1; break;
         case 'u': controles[J_LUIGI].arriba    = 1; break;
         case 'd': controles[J_LUIGI].abajo     = 1; break;
         case 'a': controles[J_LUIGI].salto     = 1; break;
-        case 'n': break; // Si manda n, se queda quie
+        case 'n': break;
     }
 }
 
@@ -326,20 +324,19 @@ static void respawnJugador(Jugador_t *j) {
     j->velX = 0; j->velY = 0;
     j->enSuelo = 0; j->enEscalera = 0; j->saltando = 0;
     j->invencible = INVENCIBLE_FRAMES;
+    j->muriendo = 0;
+    j->frameAnimMuerte = 0;
 }
 
 /* ========================== UPDATE ========================== */
 
-
 void Fisicas_Update(void)
 {
-    leerControles2P(); // Llamamos a la nueva función limpia por UART
+    leerControles2P();
 
-    // === Contar barriles activos, spawnar si faltan ===
     barrilSpawnTimer++;
     if (barrilSpawnTimer >= BARRIL_SPAWN_INTERVAL) {
         barrilSpawnTimer = 0;
-        // Solo spawnar si hay al menos 1 slot libre
         uint8_t activos = 0;
         for (uint8_t i = 0; i < MAX_ENEMIGOS; i++)
             if (enemigos[i].activo) activos++;
@@ -348,11 +345,30 @@ void Fisicas_Update(void)
         }
     }
 
-    // === Update jugadores ===
+    if (dkTirando > 0) dkTirando--;
+
     for (uint8_t p = 0; p < NUM_JUGADORES; p++) {
         Jugador_t *j   = &jugadores[p];
         Controles_t *c = &controles[p];
         if (!j->vivo) continue;
+
+        if (j->muriendo > 0) {
+            j->muriendo--;
+            uint8_t elapsed = MUERTE_FRAMES - j->muriendo;
+            j->frameAnimMuerte = elapsed / (MUERTE_FRAMES / 5);
+            if (j->frameAnimMuerte >= 5) j->frameAnimMuerte = 4;
+
+            if (j->muriendo == 0) {
+                j->vidas--;
+                if (j->vidas == 0) {
+                    j->vivo = 0;
+                } else {
+                    respawnJugador(j);
+                }
+            }
+            continue;
+        }
+
         if (j->invencible > 0) j->invencible--;
 
         manejarEscalera(j, c);
@@ -362,33 +378,48 @@ void Fisicas_Update(void)
         colisionHorizontal(j);
         colisionVertical(j);
 
-        if (j->velX != 0) {
+        if (j->enEscalera) {
+            if (c->arriba || c->abajo) {
+                j->contadorAnim++;
+                if (j->contadorAnim >= 4) {
+                    j->contadorAnim = 0;
+                    j->frameAnim = (j->frameAnim + 1) % 7;
+                }
+            }
+        } else if (j->velX != 0) {
             j->contadorAnim++;
-            if (j->contadorAnim >= 6) { j->contadorAnim = 0; j->frameAnim = (j->frameAnim+1)%4; }
-        } else { j->frameAnim = 0; j->contadorAnim = 0; }
+            if (j->contadorAnim >= 6) {
+                j->contadorAnim = 0;
+                j->frameAnim = (j->frameAnim + 1) % 4;
+            }
+        } else {
+            j->frameAnim = 0;
+            j->contadorAnim = 0;
+        }
+
+        if (j->vivo && FP_TO_PX(j->y) < VICTORIA_Y_LIMITE) {
+            ganadorID = p;
+            estadoJuego = ESTADO_WIN;
+        }
     }
 
     actualizarEnemigos();
 
-    //COLISION DE JUGADORES
     for (uint8_t p = 0; p < NUM_JUGADORES; p++) {
         Jugador_t *j = &jugadores[p];
-        if (!j->vivo || j->invencible > 0) continue;
+        if (!j->vivo || j->invencible > 0 || j->muriendo > 0) continue;
         for (uint8_t i = 0; i < MAX_ENEMIGOS; i++) {
             if (!enemigos[i].activo) continue;
             if (colisionRadial(j, &enemigos[i])) {
-                j->vidas--;
-                if (j->vidas == 0) {
-                    j->vivo = 0;
-                } else {
-                    respawnJugador(j);
-                }
+                j->muriendo = MUERTE_FRAMES;
+                j->frameAnimMuerte = 0;
+                j->velX = 0;
+                j->velY = 0;
                 break;
             }
         }
     }
 
-    //GAME OVER
     if (!jugadores[J_MARIO].vivo && !jugadores[J_LUIGI].vivo) {
         estadoJuego = ESTADO_GAME_OVER;
     }

@@ -2,19 +2,21 @@
 /**
  ******************************************************************************
  * @file           : main.c
+ * @brief          : PANTALLA - LOGICA - COLISIONES
  ******************************************************************************
  *
  * ESTADOS:
- *   START
- *   PLAYING -
- *   CORRECCIÓN DE VIDAS
- *   CORRECCIÓN DE ANIMACIÓN
- *   CORRECCIÓN MAPA
- *   MOVIMIENTO LISTO
- *   GAME_OVER
- *   RESET
+ * START
+ * PLAYING -
+ * CORRECCIÓN DE VIDAS
+ * CORRECCIÓN DE ANIMACIÓN
+ * CORRECCIÓN MAPA
+ * MOVIMIENTO LISTO
+ * GAME_OVER
+ * RESET
  */
 /* USER CODE END Header */
+
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "fatfs.h"
@@ -28,11 +30,6 @@
 #include "fatfs_sd.h"
 #include "fisicas.h"
 /* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
@@ -49,18 +46,21 @@ uint32_t totalSpace, freeSpace;
 #define VIDA_W   7
 #define VIDA_H   8
 #define VIDA_GAP 2
+
+/* Posiciones de DK y Peach */
+#define DK_X     2
+#define DK_Y     16
+#define DK_W     34
+#define DK_H     48
+#define PEACH_X  111
+#define PEACH_Y  8
+#define PEACH_W  18
+#define PEACH_H  24
 /* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
-
 TIM_HandleTypeDef htim6;
-
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart2;
 
@@ -77,17 +77,20 @@ int16_t prevEnemyX[MAX_ENEMIGOS];
 int16_t prevEnemyY[MAX_ENEMIGOS];
 uint8_t prevVidas[NUM_JUGADORES];
 
-// Flag para saber si ya se pinto la pantalla de cada estado
-uint8_t estadoPintado = 0;
-volatile uint8_t anim_flag = 0; 	// Banderas de animación y movimiento
-uint8_t frame_start = 0; 		// Frame de la animacion start
-uint8_t mario_ready = 0; 		// Bandera para mario listo
-uint8_t luigi_ready = 0; 		// Bandera para luigi listo
-volatile uint8_t numFrame = 0;
-uint8_t uart4_rx;
-volatile uint8_t cRecibido = 0; //bandera UART
+uint8_t pantalla_actualizada = 0;
+volatile uint8_t flag_animacion = 0;
+uint8_t frame_inicial = 0;
+uint8_t mario_listo = 0;
+uint8_t luigi_listo = 0;
+volatile uint8_t contador_frames = 0;
+uint8_t buffer_uart4;
+volatile uint8_t bandera_play = 0;
+volatile uint8_t bandera_skip = 0; // NUEVA BANDERA: Para saltar la cinematica
 volatile uint8_t estado_J1 = 'N';
 volatile uint8_t estado_J2 = 'n';
+
+/* Animación de DK y Peach - (peachFrame ahora es fijo 0) */
+uint8_t frame_princesa = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -105,8 +108,11 @@ void dibujarHUD(void);
 void actualizarHUD(void);
 void gameLoop(void);
 void iniciarJuego(void);
-
-static uint8_t checarComandoPlay(void);
+void dibujarDK(void);
+void dibujarPeach(void);
+static uint8_t revisar_boton_play(void);
+/* NUEVA FUNCION: Para la cinematica */
+uint8_t drawImageSD_Chunked_Skip(char *filename, uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t total_frames);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -131,7 +137,7 @@ void unmount_SD()                 {
 }
 
 /* ---------- FONDOS Y ANIMACIONES ---------- */
-void drawImageSD_Chunked (char *filename, uint16_t x, uint16_t y,
+void drawImageSD_Chunked(char *filename, uint16_t x, uint16_t y,
 		uint16_t width, uint16_t height, uint8_t total_frames) {
 	HAL_TIM_Base_Stop_IT(&htim6);
 	uint16_t chunk = 10;
@@ -141,7 +147,6 @@ void drawImageSD_Chunked (char *filename, uint16_t x, uint16_t y,
 	open_ReadFile(filename);
 	for (uint8_t frame = 0; frame < total_frames; frame++) {
 		for (uint16_t row = 0; row < height; row += chunk) {
-			// Leer una fila completa
 			uint16_t rows = (row + chunk > height) ? (height - row) : chunk;
 			f_read(&fil, buffer, width * rows * sizeof(uint16_t), &br);
 			if (br != width * rows * sizeof(uint16_t)) break;
@@ -153,21 +158,50 @@ void drawImageSD_Chunked (char *filename, uint16_t x, uint16_t y,
 	HAL_TIM_Base_Start_IT(&htim6);
 }
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-    if (htim->Instance == TIM6)
-    {
-    	anim_flag = 1;
-    	numFrame++;
+/* NUEVA FUNCION: Animacion que se interrumpe si la bandera_skip es 1 */
+uint8_t drawImageSD_Chunked_Skip(char *filename, uint16_t x, uint16_t y,
+		uint16_t width, uint16_t height, uint8_t total_frames) {
+	HAL_TIM_Base_Stop_IT(&htim6);
+	uint16_t chunk = 10;
+	uint16_t buffer[BUFFER_PIXELS*chunk];
+
+	mount_SD();
+	open_ReadFile(filename);
+	for (uint8_t frame = 0; frame < total_frames; frame++) {
+
+        // REVISAMOS SI EL USUARIO PRESIONO 'T'
+        if (bandera_skip == 1) {
+            close_File(filename);
+	        unmount_SD();
+	        HAL_TIM_Base_Start_IT(&htim6);
+            return 1; // Retorna 1 indicando que fue interrumpido
+        }
+
+		for (uint16_t row = 0; row < height; row += chunk) {
+			uint16_t rows = (row + chunk > height) ? (height - row) : chunk;
+			f_read(&fil, buffer, width * rows * sizeof(uint16_t), &br);
+			if (br != width * rows * sizeof(uint16_t)) break;
+			LCD_Bitmap(x, y + row, width, rows, buffer);
+		}
+	}
+	close_File(filename);
+	unmount_SD();
+	HAL_TIM_Base_Start_IT(&htim6);
+    return 0; // Termino normalmente
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    if (htim->Instance == TIM6) {
+    	flag_animacion = 1;
+    	contador_frames++;
     }
 }
 
 void makeScore(void) {
-	// Proceso para determinar el score de cada uno
 	drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
 }
-/* ---------- HUD ---------- */
 
+/* ---------- HUD ---------- */
 void dibujarHUD(void) {
     for (uint8_t i = 0; i < jugadores[J_MARIO].vidas; i++) {
         uint16_t hx = 2 + i * (VIDA_W + VIDA_GAP);
@@ -196,7 +230,6 @@ void actualizarHUD(void) {
 }
 
 /* ---------- MAPA ---------- */
-
 void dibujarMapa(void) {
     LCD_Clear(0x0000);
     for (uint8_t row = 0; row < MAP_ROWS; row++) {
@@ -218,7 +251,6 @@ void dibujarMapa(void) {
 }
 
 /* ---------- GRAFICOS ---------- */
-
 void borrarSprite(int16_t x, int16_t y, uint8_t w, uint8_t h) {
     if (x < 0 || y < 0) return;
     uint8_t dw = (x + w > SCREEN_W) ? SCREEN_W - x : w;
@@ -260,26 +292,72 @@ static uint8_t spritesOverlap(int16_t x1, int16_t y1,
     return 1;
 }
 
+/* ========== DK: CORREGIDO ORIENTACIÓN ========== */
+void dibujarDK(void) {
+    int16_t dy = 0;
+    if (dkTirando > DK_THROW_FRAMES / 2) {
+        dy = -4;
+    }
+    LCD_Sprite(DK_X, DK_Y + dy, DK_W, DK_H, (const uint16_t*)DK_2, 1, 0, 0, 0);
+}
+
+/* ========== Peach: SIN ANIMACIÓN (Fija) ========== */
+void dibujarPeach(void) {
+    LCD_Sprite_Transparent(PEACH_X, PEACH_Y, PEACH_W, PEACH_H,
+                           (const uint16_t*)peach, 4, 0,
+                           0, 0, 0x0000);
+}
+
+/* ========== Jugador: escalera, muerte, normal ========== */
 static void dibujarJugador(uint8_t p) {
     Jugador_t *j = &jugadores[p];
     int16_t jx = Jugador_PixelX(p);
     int16_t jy = Jugador_PixelY(p);
+
+    /* Muerto permanentemente: último frame de muerte */
     if (!j->vivo) {
-        uint16_t color = (p == J_MARIO) ? 0xF800 : 0x07E0;
-        FillRect(jx, jy, SPRITE_W, SPRITE_H, color);
+        const uint16_t *deathSprite = (p == J_MARIO)
+            ? (const uint16_t*)mario_death : (const uint16_t*)luigi_death;
+        LCD_Sprite_Transparent(jx, jy, SPRITE_W, SPRITE_H,
+                               deathSprite, 5, 4,
+                               (j->direccion < 0) ? 1 : 0, 0, 0x0000);
         return;
     }
+
+    /* Animación de muerte en curso */
+    if (j->muriendo > 0) {
+        const uint16_t *deathSprite = (p == J_MARIO)
+            ? (const uint16_t*)mario_death : (const uint16_t*)luigi_death;
+        LCD_Sprite_Transparent(jx, jy, SPRITE_W, SPRITE_H,
+                               deathSprite, 5, j->frameAnimMuerte,
+                               (j->direccion < 0) ? 1 : 0, 0, 0x0000);
+        return;
+    }
+
+    /* Parpadeo de invencibilidad */
     if (j->invencible > 0 && (j->invencible % 8) < 4) return;
+
+    /* En escalera: sprite de escalera (7 frames) */
+    if (j->enEscalera) {
+        const uint16_t *stairSprite = (p == J_MARIO)
+            ? (const uint16_t*)mario_stairs : (const uint16_t*)luigi_stairs;
+        LCD_Sprite_Transparent(jx, jy, SPRITE_W, SPRITE_H,
+                               stairSprite, 7, j->frameAnim,
+                               0, 0, 0x0000);
+        return;
+    }
+
+    /* Normal: caminar/parado (5 frames) */
     const uint16_t *sprite = (p == J_MARIO)
         ? (const uint16_t*)mario : (const uint16_t*)luigi;
+
     LCD_Sprite_Transparent(jx, jy, SPRITE_W, SPRITE_H,
-                           sprite, 1, 0,
+                           sprite, 5, j->frameAnim,
                            (j->direccion < 0) ? 1 : 0,
                            0, 0x0000);
 }
 
 /* ---------- INICIAR JUEGO ---------- */
-
 void iniciarJuego(void) {
     LCD_Clear(0x0000);
     dibujarMapa();
@@ -288,12 +366,14 @@ void iniciarJuego(void) {
     for (int i = 0; i < MAX_ENEMIGOS; i++)  { prevEnemyX[i] = -1; prevEnemyY[i] = -1; }
     prevVidas[J_MARIO] = 0;
     prevVidas[J_LUIGI] = 0;
+
+    dibujarDK();
+    dibujarPeach();
     dibujarHUD();
     estadoJuego = ESTADO_PLAYING;
 }
 
-/* ---------- GAME LOOP (solo se llama en ESTADO_PLAYING) ---------- */
-
+/* ---------- GAME LOOP ---------- */
 void gameLoop(void) {
     Fisicas_Update();
     actualizarHUD();
@@ -306,6 +386,7 @@ void gameLoop(void) {
         ny[p] = Jugador_PixelY(p);
         moved[p] = (prevX[p] != nx[p] || prevY[p] != ny[p]) ? 1 : 0;
         if (jugadores[p].invencible > 0) moved[p] = 1;
+        if (jugadores[p].muriendo > 0) moved[p] = 1;
     }
     for (uint8_t p = 0; p < NUM_JUGADORES; p++) {
         if (!moved[p]) continue;
@@ -350,31 +431,29 @@ void gameLoop(void) {
             prevEnemyY[i] = ey;
         }
     }
+
+    for (uint8_t p = 0; p < NUM_JUGADORES; p++) {
+        if (!jugadores[p].vivo && prevX[p] >= 0) {
+            dibujarJugador(p);
+        }
+    }
+
+    {
+        static uint8_t fase_dk_anterior = 0;
+        uint8_t fase_actual_dk = 0;
+        if (dkTirando > DK_THROW_FRAMES / 2) fase_actual_dk = 2;
+        else if (dkTirando > 0)              fase_actual_dk = 1;
+
+        if (fase_actual_dk != fase_dk_anterior) {
+            borrarSprite(DK_X, DK_Y - 4, DK_W, DK_H + 4);
+            repararTiles(DK_X, DK_Y - 4, DK_W, DK_H + 4);
+            fase_dk_anterior = fase_actual_dk;
+        }
+        dibujarDK();
+    }
+
+    dibujarPeach();
 }
-
-/*
- * Checa si alguno de los ESP32 mando el comando 'P'.
- * Se lee I2C de ambos jugadores.
- */
-//static uint8_t checarComandoPlay(void) {
-//    uint8_t cmd = CMD_NONE;
-//    if (hi2c1.State != HAL_I2C_STATE_READY) {
-//        __HAL_I2C_DISABLE(&hi2c1); HAL_Delay(1);
-//        __HAL_I2C_ENABLE(&hi2c1);
-//        hi2c1.State = HAL_I2C_STATE_READY; hi2c1.Lock = HAL_UNLOCKED;
-//    }
-//    // Checar J1
-//    if (HAL_I2C_Master_Receive(&hi2c1, ESP32_J1_ADDR, &cmd, 1, 50) == HAL_OK) {
-//        if (cmd == CMD_PLAY) return 1;
-//    }
-//    // Checar J2
-//    cmd = CMD_NONE;
-//    if (HAL_I2C_Master_Receive(&hi2c1, ESP32_J2_ADDR, &cmd, 1, 50) == HAL_OK) {
-//        if (cmd == CMD_PLAY || cmd == 'p') return 1;
-//    }
-//    return 0;
-//}
-
 /* USER CODE END 0 */
 
 /**
@@ -383,39 +462,20 @@ void gameLoop(void) {
   */
 int main(void)
 {
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
   SystemClock_Config();
 
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI1_Init();
   MX_FATFS_Init();
   MX_USART2_UART_Init();
   MX_TIM6_Init();
   MX_UART4_Init();
+
   /* USER CODE BEGIN 2 */
     transmit_uart("\r\n--- REINICIO DEL SISTEMA ---\r\n");
 
     HAL_TIM_Base_Start_IT(&htim6);
-
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_SET);
     HAL_Delay(10);
 
@@ -425,33 +485,15 @@ int main(void)
     mount_SD();
     unmount_SD();
 
-
-
     estadoJuego = ESTADO_START;
-    //estadoJuego = ESTADO_PLAYING;
-    estadoPintado = 0;
+    pantalla_actualizada = 0;
 
-    /*----------------- PRUEBA ESCENAS -----------------*/
-    // Pantalla de reposo
+    /*----------------- PANTALLA DE REPOSO (LOAD SCREEN) -----------------*/
+    // Se muestra al encender la consola
     drawImageSD_Chunked("load_screen.bin", 0, 0, 240, 320, 1);
     HAL_Delay(1000);
-    // Menu de inicio (ya en switch case)
-//    drawImageSD_Chunked("start_menu.bin", 0, 0, 240, 320, 1);
-//    LCD_Sprite(100, 100, 37, 7, mario_start, 1, 0, 0, 0);
-//    HAL_Delay(1000);
-//    // Animacion inicial
-//    drawImageSD_Chunked("start_animation.bin", 0, 0, 240, 320, 22);
-//    HAL_Delay(1000);
-//    // Secuencia WIN
-//    drawImageSD_Chunked("win.bin", 0, 0, 240, 320, 8);
-//    drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
-//    HAL_Delay(1000);
-//
-//    // Secuencia Game Over
-//    drawImageSD_Chunked("game_over.bin", 0, 0, 240, 320, 9);
-//    drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
-//    HAL_Delay(1000);
-    HAL_UART_Receive_IT(&huart4, &uart4_rx, 1);
+
+    HAL_UART_Receive_IT(&huart4, &buffer_uart4, 1);
     HAL_TIM_Base_Start_IT(&htim6);
   /* USER CODE END 2 */
 
@@ -462,82 +504,142 @@ int main(void)
       switch (estadoJuego) {
 
       case ESTADO_START:
-          if (!estadoPintado) {
-              // Mostrar pantalla de inicio
+          if (!pantalla_actualizada) {
+              // --- AVISAMOS A SONIDO QUE INICIA EL START (Por huart2) ---
+              uint8_t cmd_inicio = 'S';
+              HAL_UART_Transmit(&huart2, &cmd_inicio, 1, 10);
+
               LCD_Clear(0x0000);
               if (fres == FR_OK) {
                   hspi1.Instance->CR1 &= ~SPI_BAUDRATEPRESCALER_256;
                   hspi1.Instance->CR1 |= SPI_BAUDRATEPRESCALER_2;
                   drawImageSD_Chunked("start_menu.bin", 0, 0, 240, 320, 1);
-                  LCD_Sprite(146, 188, 39, 7, mario_start, 2, frame_start, 0, 0);
-                  LCD_Sprite(146, 233, 39, 7, luigi_start, 2, frame_start, 0, 0);
+                  LCD_Sprite(146, 188, 39, 7, mario_start, 2, frame_inicial, 0, 0);
+                  LCD_Sprite(146, 233, 39, 7, luigi_start, 2, frame_inicial, 0, 0);
               }
               transmit_uart("Estado: START - esperando P\r\n");
-              estadoPintado = 1;
+              pantalla_actualizada = 1;
           }
-          // Animacion de los botones
-          if (anim_flag) {
-        	  // ----- PRUEBA SPRITES ---------
-//        	  frame_start = (numFrame/2)%5;
-//        	  LCD_Sprite(10, 220, 18, 18, mario, 5, frame_start, 0, 0);
-//        	  LCD_Sprite(40, 220, 18, 18, luigi, 5, frame_start, 0, 0);
-//        	  LCD_Sprite(50, 150, 18, 18, mario_death, 5, frame_start, 0, 0);
-//        	  LCD_Sprite(80, 150, 18, 18, luigi_death, 5, frame_start, 0, 0);
-//
-//        	  frame_start = (numFrame/2)%7;
-//        	  LCD_Sprite(200, 200, 18, 18, mario_stairs, 7, frame_start, 0, 0);
-//        	  LCD_Sprite(220, 200, 18, 18, luigi_stairs, 7, frame_start, 0, 0);
 
-        	  // ---------- Animacion MENU START
-        	  frame_start = (numFrame/2)%2; 	//XOR
-        	  LCD_Sprite(76, 130, 88, 7, insert_coin, 2, frame_start, 0, 0);
-        	  //frame_start = (numFrame/2)%4;
-        	  //LCD_Sprite(111, 33, 18, 24, peach, 4, frame_start, 0, 0);
-        	  // ------ CONDICIÓN DE PARPADEO ---------
-        	  if (mario_ready) LCD_Sprite(146, 188, 39, 7, mario_start, 2, 0, 0, 0);
-        	  else LCD_Sprite(146, 188, 39, 7, mario_start, 2, frame_start, 0, 0);
+          frame_inicial = (contador_frames/2)%2;
+          LCD_Sprite(76, 130, 88, 7, insert_coin, 2, frame_inicial, 0, 0);
 
-        	  if (luigi_ready) LCD_Sprite(146, 233, 39, 7, luigi_start, 2, 0, 0, 0);
-        	  else LCD_Sprite(146, 233, 39, 7, luigi_start, 2, frame_start, 0, 0);
-          }
-          // Esperar comando 'P' para iniciar
-          if (checarComandoPlay()) {
-              estadoPintado = 0;
-              iniciarJuego();  // cambia estado a PLAYING
-              transmit_uart("Estado: PLAYING\r\n");
+          if (mario_listo) LCD_Sprite(146, 188, 39, 7, mario_start, 2, 0, 0, 0);
+          else LCD_Sprite(146, 188, 39, 7, mario_start, 2, frame_inicial, 0, 0);
+
+          if (luigi_listo) LCD_Sprite(146, 233, 39, 7, luigi_start, 2, 0, 0, 0);
+          else LCD_Sprite(146, 233, 39, 7, luigi_start, 2, frame_inicial, 0, 0);
+
+          if (revisar_boton_play()) {
+              // Pasamos al estado de cinematica en vez de ir a PLAYING de una vez
+              pantalla_actualizada = 0;
+              estadoJuego = 5; // Usamos 5 como valor temporal para ESTADO_CINEMATICA
           }
           break;
-//IMPORTANTE BORRAR INICIAR JUEGO DE ESTADO_PLAYING
+
+      // --- NUEVO ESTADO: CINEMATICA (ESTADO_JUEGO = 5) ---
+      case 5:
+          if (!pantalla_actualizada) {
+              LCD_Clear(0x0000);
+              bandera_skip = 0; // Reiniciamos la bandera
+
+              transmit_uart("Reproduciendo Cinematica (start_animation.bin)...\r\n");
+
+              // Reproducimos la animacion, guardamos si el usuario la skipeo
+              uint8_t se_salto = drawImageSD_Chunked_Skip("start_animation.bin", 0, 0, 240, 320, 22);
+
+              if (se_salto) {
+                  transmit_uart("Cinematica saltada con 'T'\r\n");
+
+                  // Avisamos al sonido y entramos al juego
+                  uint8_t cmd_jugar = 'P';
+                  HAL_UART_Transmit(&huart2, &cmd_jugar, 1, 10);
+                  iniciarJuego();
+                  transmit_uart("Estado: PLAYING\r\n");
+              } else {
+                  transmit_uart("Cinematica terminada. Regresando a Menu.\r\n");
+                  estadoJuego = ESTADO_START;
+              }
+
+              pantalla_actualizada = 1;
+          }
+          break;
+
       case ESTADO_PLAYING:
-    	  //iniciarJuego();
           gameLoop();
-          // estadoJuego puede cambiar a GAME_OVER dentro de Fisicas_Update
-          if (estadoJuego == ESTADO_GAME_OVER) {
-              estadoPintado = 0;
+          if (estadoJuego == ESTADO_GAME_OVER || estadoJuego == ESTADO_WIN) {
+              pantalla_actualizada = 0;
           }
           break;
 
       case ESTADO_GAME_OVER:
-          if (!estadoPintado) {
-              // Borrar pantalla y mostrar GAME OVER
+          if (!pantalla_actualizada) {
+              // --- AVISAMOS A SONIDO QUE MURIERON (Por huart2) ---
+              uint8_t cmd_muerte = 'M';
+              HAL_UART_Transmit(&huart2, &cmd_muerte, 1, 10);
+
               LCD_Clear(0x0000);
-              LCD_Print("GAME OVER", 60, 140, 2, 0xF800, 0x0000);
-              LCD_Print("Press P", 75, 170, 1, 0xFFFF, 0x0000);
+              drawImageSD_Chunked("game_over.bin", 0, 0, 240, 320, 9);
+              drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
+
+              LCD_Print("LOSE", 140, 135, 2, 0xF800, 0x0000);
+              LCD_Print("LOSE", 140, 195, 2, 0xF800, 0x0000);
+              LCD_Print("PRESS P TO RESTART", 20, 280, 1, 0xFFFF, 0x0000);
+
               transmit_uart("Estado: GAME_OVER - esperando P\r\n");
-              estadoPintado = 1;
+              pantalla_actualizada = 1;
           }
-          // Esperar 'P' para ir a RESET
-          if (checarComandoPlay()) {
-              estadoPintado = 0;
+          if (revisar_boton_play()) {
+              // --- AVISAMOS DE UN SALTO PARA RESETEAR (Por huart2) ---
+              uint8_t cmd_salto = 'B';
+              HAL_UART_Transmit(&huart2, &cmd_salto, 1, 10);
+
+              pantalla_actualizada = 0;
               estadoJuego = ESTADO_RESET;
               transmit_uart("Estado: RESET\r\n");
           }
           break;
 
+      case ESTADO_WIN:
+          if (!pantalla_actualizada) {
+              // --- AVISAMOS A SONIDO DE LA VICTORIA (Por huart2) ---
+              uint8_t cmd_victoria = 'W';
+              HAL_UART_Transmit(&huart2, &cmd_victoria, 1, 10);
+
+              LCD_Clear(0x0000);
+              drawImageSD_Chunked("win.bin", 0, 0, 240, 320, 8);
+              drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
+
+              if (ganadorID == J_MARIO) {
+                  LCD_Print("WIN", 140, 135, 2, 0x07E0, 0x0000);
+                  LCD_Print("LOSE", 140, 195, 2, 0xF800, 0x0000);
+              } else {
+                  LCD_Print("LOSE", 140, 135, 2, 0xF800, 0x0000);
+                  LCD_Print("WIN", 140, 195, 2, 0x07E0, 0x0000);
+              }
+
+              LCD_Print("PRESS P TO RESTART", 20, 280, 1, 0xFFFF, 0x0000);
+
+              transmit_uart("Fin del juego. Ganador registrado.\r\n");
+              pantalla_actualizada = 1;
+          }
+
+          if (revisar_boton_play()) {
+              // --- AVISAMOS DE UN SALTO PARA RESETEAR (Por huart2) ---
+              uint8_t cmd_salto_dos = 'B';
+              HAL_UART_Transmit(&huart2, &cmd_salto_dos, 1, 10);
+
+              pantalla_actualizada = 0;
+              estadoJuego = ESTADO_RESET;
+          }
+          break;
+
       case ESTADO_RESET:
-          // Limpiar todo y volver a START
-          estadoPintado = 0;
+          pantalla_actualizada = 0;
           estadoJuego = ESTADO_START;
+          // Reiniciamos al estado S de sonido si el usuario quiere
+          uint8_t comando_reinicio = 'S';
+          HAL_UART_Transmit(&huart2, &comando_reinicio, 1, 10);
           break;
       }
 
@@ -549,23 +651,14 @@ int main(void)
   /* USER CODE END 3 */
 }
 
-/**
-  * @brief System Clock Configuration
-  * @retval None
-  */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /** Configure the main internal regulator output voltage
-  */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
 
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
@@ -576,42 +669,19 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 2;
   RCC_OscInitStruct.PLL.PLLR = 2;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) Error_Handler();
 
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) Error_Handler();
 }
 
-/**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
 static void MX_SPI1_Init(void)
 {
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
   hspi1.Instance = SPI1;
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
@@ -624,69 +694,25 @@ static void MX_SPI1_Init(void)
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
-
+  if (HAL_SPI_Init(&hspi1) != HAL_OK) Error_Handler();
 }
 
-/**
-  * @brief TIM6 Initialization Function
-  * @param None
-  * @retval None
-  */
 static void MX_TIM6_Init(void)
 {
-
-  /* USER CODE BEGIN TIM6_Init 0 */
-
-  /* USER CODE END TIM6_Init 0 */
-
   TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM6_Init 1 */
-
-  /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
   htim6.Init.Prescaler = 8400-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim6.Init.Period = 2500-1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
-  {
-    Error_Handler();
-  }
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK) Error_Handler();
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM6_Init 2 */
-
-  /* USER CODE END TIM6_Init 2 */
-
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK) Error_Handler();
 }
 
-/**
-  * @brief UART4 Initialization Function
-  * @param None
-  * @retval None
-  */
 static void MX_UART4_Init(void)
 {
-
-  /* USER CODE BEGIN UART4_Init 0 */
-
-  /* USER CODE END UART4_Init 0 */
-
-  /* USER CODE BEGIN UART4_Init 1 */
-
-  /* USER CODE END UART4_Init 1 */
   huart4.Instance = UART4;
   huart4.Init.BaudRate = 115200;
   huart4.Init.WordLength = UART_WORDLENGTH_8B;
@@ -695,30 +721,11 @@ static void MX_UART4_Init(void)
   huart4.Init.Mode = UART_MODE_TX_RX;
   huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart4.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart4) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN UART4_Init 2 */
-  /* USER CODE END UART4_Init 2 */
-
+  if (HAL_UART_Init(&huart4) != HAL_OK) Error_Handler();
 }
 
-/**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
 static void MX_USART2_UART_Init(void)
 {
-
-  /* USER CODE BEGIN USART2_Init 0 */
-
-  /* USER CODE END USART2_Init 0 */
-
-  /* USER CODE BEGIN USART2_Init 1 */
-
-  /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
   huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
@@ -727,67 +734,38 @@ static void MX_USART2_UART_Init(void)
   huart2.Init.Mode = UART_MODE_TX_RX;
   huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART2_Init 2 */
-
-  /* USER CODE END USART2_Init 2 */
-
+  if (HAL_UART_Init(&huart2) != HAL_OK) Error_Handler();
 }
 
-/**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-  /* USER CODE BEGIN MX_GPIO_Init_1 */
 
-  /* USER CODE END MX_GPIO_Init_1 */
-
-  /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, LCD_RST_Pin|LCD_D1_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LCD_RD_Pin|LCD_WR_Pin|LCD_RS_Pin|LCD_D7_Pin
                           |LCD_D0_Pin|LCD_D2_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LCD_CS_Pin|LCD_D6_Pin|LCD_D3_Pin|LCD_D5_Pin
                           |LCD_D4_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SD_SS_GPIO_Port, SD_SS_Pin, GPIO_PIN_SET);
 
-  /*Configure GPIO pin : PC0 */
   GPIO_InitStruct.Pin = GPIO_PIN_0;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LCD_RST_Pin LCD_D1_Pin */
   GPIO_InitStruct.Pin = LCD_RST_Pin|LCD_D1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LCD_RD_Pin LCD_WR_Pin LCD_RS_Pin LCD_D7_Pin
-                           LCD_D0_Pin LCD_D2_Pin */
   GPIO_InitStruct.Pin = LCD_RD_Pin|LCD_WR_Pin|LCD_RS_Pin|LCD_D7_Pin
                           |LCD_D0_Pin|LCD_D2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -795,8 +773,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LCD_CS_Pin LCD_D6_Pin LCD_D3_Pin LCD_D5_Pin
-                           LCD_D4_Pin */
   GPIO_InitStruct.Pin = LCD_CS_Pin|LCD_D6_Pin|LCD_D3_Pin|LCD_D5_Pin
                           |LCD_D4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -804,70 +780,58 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : SD_SS_Pin */
   GPIO_InitStruct.Pin = SD_SS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
   HAL_GPIO_Init(SD_SS_GPIO_Port, &GPIO_InitStruct);
-
-  /* USER CODE BEGIN MX_GPIO_Init_2 */
-
-  /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == UART4) {
-
-        if (uart4_rx == CMD_PLAY || uart4_rx == 'p') {
-            cRecibido = 1;
-        }
-        // Si es Mayúscula, es de Mario (J1)
-        else if (uart4_rx >= 'A' && uart4_rx <= 'Z') {
-            estado_J1 = uart4_rx;
-        }
-        // Si es Minúscula, es de Luigi (J2)
-        else if (uart4_rx >= 'a' && uart4_rx <= 'z') {
-            estado_J2 = uart4_rx;
-        }
-
-        // Reactivamos interrupción
-        HAL_UART_Receive_IT(&huart4, &uart4_rx, 1);
+        HAL_UART_Receive_IT(&huart4, &buffer_uart4, 1);
     }
 }
-static uint8_t checarComandoPlay(void) {
-    // ¿El Callback nos avisó que llegó una 'P' o 'p'?
-    if (cRecibido == 1) {
-        cRecibido = 0; // Apagamos la alarma
 
-        // ---> DEBUGGER SEGURO <---
-        transmit_uart("UART4 RX -> ¡Comando PLAY recibido por Interrupcion!\r\n");
-
-        return 1; // Le decimos al main que arranque el juego
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == UART4) {
+        if (buffer_uart4 == CMD_PLAY || buffer_uart4 == 'p') {
+            bandera_play = 1;
+        }
+        else if (buffer_uart4 == 'T' || buffer_uart4 == 't') {
+            bandera_skip = 1;
+        }
+        else if (buffer_uart4 >= 'A' && buffer_uart4 <= 'Z') {
+            estado_J1 = buffer_uart4;
+        }
+        else if (buffer_uart4 >= 'a' && buffer_uart4 <= 'z') {
+            estado_J2 = buffer_uart4;
+        }
+        HAL_UART_Receive_IT(&huart4, &buffer_uart4, 1);
     }
-    return 0; // Si no hay nada, no hacemos nada
+}
+
+static uint8_t revisar_boton_play(void) {
+    if (bandera_play == 1) {
+        bandera_play = 0;
+        transmit_uart("UART4 RX -> Comando PLAY recibido!\r\n");
+        return 1;
+    }
+    return 0;
 }
 /* USER CODE END 4 */
 
-/**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
 void Error_Handler(void)
 {
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
-  while (1)
-  {
-  }
-  /* USER CODE END Error_Handler_Debug */
+  while (1) { }
 }
+
 #ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
+  * where the assert_param error has occurred.
   * @param  file: pointer to the source file name
   * @param  line: assert_param error line source number
   * @retval None

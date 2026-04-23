@@ -691,8 +691,7 @@ void LCD_Sprite_Transparent(int x, int y, int width, int height,
 				// Dibujar solo si no es transparente
 				if (pixel != transparent_color) {
 					LCD_CS_L();
-					SetWindows(x + (width - 1 - i), y + j, x + (width - 1 - i),
-							y + j);
+					SetWindows(x + i, y + j, x + i, y + j);
 					LCD_CMD(0x02c);
 					LCD_DATA(pixel >> 8);
 					LCD_DATA(pixel & 0xFF);

@@ -28,7 +28,7 @@
 #define PX_TO_FP(px)    ((int32_t)(px) << FP_SHIFT)
 #define FP_TO_PX(fp)    ((int32_t)(fp) >> FP_SHIFT)
 
-#define GRAVEDAD        60
+#define GRAVEDAD        50
 #define VEL_SALTO       (-800)
 #define VEL_CAMINAR     384
 #define VEL_ESCALERA    256
@@ -50,19 +50,27 @@
 #define BARRIL_H        16
 #define BARRIL_RADIO    7
 #define BARRIL_SPAWN_INTERVAL  60  // ~1 seg entre spawns
+#define MUERTE_FRAMES    30
+#define DK_THROW_FRAMES  20
 
 // Fila del piso mas bajo (row 19)
 #define FILA_PISO_BAJO  19
 
+// Límite para ganar (píxel 20 desde el techo)
+#define VICTORIA_Y_LIMITE 20
+
+extern uint8_t ganadorID;
+
 // === ESTADOS DEL JUEGO ===
 typedef enum {
-    ESTADO_START,       // pantalla inicial, esperando P
-    ESTADO_PLAYING,     // jugando
-    ESTADO_GAME_OVER,   // ambos muertos, esperando P
-    ESTADO_RESET        // transicion → vuelve a START
+    ESTADO_START,
+    ESTADO_PLAYING,
+    ESTADO_GAME_OVER,
+    ESTADO_WIN,
+    ESTADO_RESET
 } EstadoJuego_t;
 
-// Comandos ESP32
+// Comandos de comunicación
 #define CMD_RIGHT   'R'
 #define CMD_LEFT    'L'
 #define CMD_UP      'U'
@@ -89,6 +97,8 @@ typedef struct {
     uint8_t id;
     uint8_t vidas;
     uint8_t invencible;
+    uint8_t muriendo;
+    uint8_t frameAnimMuerte;
 } Jugador_t;
 
 typedef struct {
@@ -103,6 +113,7 @@ extern Controles_t controles[NUM_JUGADORES];
 extern const uint8_t tilemap[MAP_ROWS][MAP_COLS];
 extern uint16_t barrilSpawnTimer;
 extern EstadoJuego_t estadoJuego;
+extern uint8_t dkTirando;
 
 void Fisicas_Init(void);
 uint8_t obtenerBloque(int16_t px, int16_t py);
