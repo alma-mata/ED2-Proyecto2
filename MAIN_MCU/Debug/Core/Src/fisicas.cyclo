@@ -13,9 +13,8 @@
 ../Core/Src/fisicas.c:210:6:spawnBarril	3
 ../Core/Src/fisicas.c:229:6:actualizarEnemigos	10
 ../Core/Src/fisicas.c:279:9:colisionRadial	3
-../Core/Src/fisicas.c:293:13:I2C_BusReset	1
-../Core/Src/fisicas.c:301:6:leerControles2P	15
-../Core/Src/fisicas.c:345:13:respawnJugador	2
-../Core/Src/fisicas.c:356:6:Fisicas_Update	19
-../Core/Src/fisicas.c:419:9:Jugador_PixelX	2
-../Core/Src/fisicas.c:420:9:Jugador_PixelY	2
+../Core/Src/fisicas.c:294:6:leerControles2P	12
+../Core/Src/fisicas.c:322:13:respawnJugador	2
+../Core/Src/fisicas.c:334:6:Fisicas_Update	19
+../Core/Src/fisicas.c:397:9:Jugador_PixelX	2
+../Core/Src/fisicas.c:398:9:Jugador_PixelY	2

@@ -117,8 +117,8 @@ void iniciarEnemigo(uint8_t idx, int16_t px, int16_t py, uint8_t radio,
 uint8_t colisionRadial(Jugador_t *j, Enemigo_t *e);
 void actualizarEnemigos(void);
 void spawnBarril(void);
-void leerControles2P(I2C_HandleTypeDef *hi2c, uint8_t dirJ1, uint8_t dirJ2);
-void Fisicas_Update(I2C_HandleTypeDef *hi2c, uint8_t dirJ1, uint8_t dirJ2);
+void leerControles2P(void);
+void Fisicas_Update(void);
 int16_t Jugador_PixelX(uint8_t id);
 int16_t Jugador_PixelY(uint8_t id);
 int16_t calcularOffsetInclinacion(uint8_t row, uint8_t col);

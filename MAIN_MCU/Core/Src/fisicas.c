@@ -286,57 +286,34 @@ uint8_t colisionRadial(Jugador_t *j, Enemigo_t *e) {
     return (dist2 <= (int32_t)sumaR * sumaR) ? 1 : 0;
 }
 
-/* ========================== CONTROLES I2C ========================== */
+/* ========================== CONTROLES UART ========================== */
+// Llamamos a las variables que están en el main.c
+extern volatile uint8_t estado_J1;
+extern volatile uint8_t estado_J2;
 
-extern UART_HandleTypeDef huart2;
-
-static void I2C_BusReset(I2C_HandleTypeDef *hi2c) {
-    __HAL_I2C_DISABLE(hi2c);
-    HAL_Delay(1);
-    __HAL_I2C_ENABLE(hi2c);
-    hi2c->State = HAL_I2C_STATE_READY;
-    hi2c->Lock  = HAL_UNLOCKED;
-}
-
-void leerControles2P(I2C_HandleTypeDef *hi2c, uint8_t dirJ1, uint8_t dirJ2)
+void leerControles2P(void)
 {
-    uint8_t cmdJ1 = CMD_NONE, cmdJ2 = CMD_NONE;
-    static uint16_t dbgCount = 0;
+    // Limpiamos pulsaciones de este frame
     memset(controles, 0, sizeof(controles));
 
-    if (hi2c->State != HAL_I2C_STATE_READY) I2C_BusReset(hi2c);
+    // --- JUGADOR 1 (Mario) ---
+    switch (estado_J1) {
+        case 'R': controles[J_MARIO].derecha   = 1; break;
+        case 'L': controles[J_MARIO].izquierda = 1; break;
+        case 'U': controles[J_MARIO].arriba    = 1; break;
+        case 'D': controles[J_MARIO].abajo     = 1; break;
+        case 'A': controles[J_MARIO].salto     = 1; break;
+        case 'N': break; // Si manda N, no hace nada (se queda quieto)
+    }
 
-    HAL_StatusTypeDef st1 = HAL_I2C_Master_Receive(hi2c, dirJ1, &cmdJ1, 1, 50);
-    if (st1 == HAL_OK) {
-        switch (cmdJ1) {
-            case 'R': controles[J_MARIO].derecha   = 1; break;
-            case 'L': controles[J_MARIO].izquierda = 1; break;
-            case 'U': controles[J_MARIO].arriba    = 1; break;
-            case 'D': controles[J_MARIO].abajo     = 1; break;
-            case 'A': controles[J_MARIO].salto     = 1; break;
-            default: break;
-        }
-    } else { I2C_BusReset(hi2c); }
-
-    HAL_StatusTypeDef st2 = HAL_I2C_Master_Receive(hi2c, dirJ2, &cmdJ2, 1, 50);
-    if (st2 == HAL_OK) {
-        switch (cmdJ2) {
-            case 'r': controles[J_LUIGI].derecha   = 1; break;
-            case 'l': controles[J_LUIGI].izquierda = 1; break;
-            case 'u': controles[J_LUIGI].arriba    = 1; break;
-            case 'd': controles[J_LUIGI].abajo     = 1; break;
-            case 'a': controles[J_LUIGI].salto     = 1; break;
-            default: break;
-        }
-    } else { I2C_BusReset(hi2c); }
-
-    dbgCount++;
-    if (dbgCount >= 30) {
-        dbgCount = 0;
-        char dbg[80];
-        sprintf(dbg, "I2C: st1=%d cmd1='%c'(0x%02X) st2=%d cmd2='%c'(0x%02X)\r\n",
-                st1, cmdJ1, cmdJ1, st2, cmdJ2, cmdJ2);
-        HAL_UART_Transmit(&huart2, (uint8_t*)dbg, strlen(dbg), 10);
+    // --- JUGADOR 2 (Luigi) ---
+    switch (estado_J2) {
+        case 'r': controles[J_LUIGI].derecha   = 1; break;
+        case 'l': controles[J_LUIGI].izquierda = 1; break;
+        case 'u': controles[J_LUIGI].arriba    = 1; break;
+        case 'd': controles[J_LUIGI].abajo     = 1; break;
+        case 'a': controles[J_LUIGI].salto     = 1; break;
+        case 'n': break; // Si manda n, se queda quie
     }
 }
 
@@ -353,9 +330,10 @@ static void respawnJugador(Jugador_t *j) {
 
 /* ========================== UPDATE ========================== */
 
-void Fisicas_Update(I2C_HandleTypeDef *hi2c, uint8_t dirJ1, uint8_t dirJ2)
+
+void Fisicas_Update(void)
 {
-    leerControles2P(hi2c, dirJ1, dirJ2);
+    leerControles2P(); // Llamamos a la nueva función limpia por UART
 
     // === Contar barriles activos, spawnar si faltan ===
     barrilSpawnTimer++;

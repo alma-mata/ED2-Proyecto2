@@ -57,12 +57,11 @@ uint32_t totalSpace, freeSpace;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
-
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim6;
 
+UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -85,15 +84,19 @@ uint8_t frame_start = 0; 		// Frame de la animacion start
 uint8_t mario_ready = 0; 		// Bandera para mario listo
 uint8_t luigi_ready = 0; 		// Bandera para luigi listo
 volatile uint8_t numFrame = 0;
+uint8_t uart4_rx;
+volatile uint8_t cRecibido = 0; //bandera UART
+volatile uint8_t estado_J1 = 'N';
+volatile uint8_t estado_J2 = 'n';
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_I2C1_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM6_Init(void);
+static void MX_UART4_Init(void);
 /* USER CODE BEGIN PFP */
 void dibujarMapa(void);
 void borrarSprite(int16_t x, int16_t y, uint8_t w, uint8_t h);
@@ -102,6 +105,8 @@ void dibujarHUD(void);
 void actualizarHUD(void);
 void gameLoop(void);
 void iniciarJuego(void);
+
+static uint8_t checarComandoPlay(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -290,7 +295,7 @@ void iniciarJuego(void) {
 /* ---------- GAME LOOP (solo se llama en ESTADO_PLAYING) ---------- */
 
 void gameLoop(void) {
-    Fisicas_Update(&hi2c1, ESP32_J1_ADDR, ESP32_J2_ADDR);
+    Fisicas_Update();
     actualizarHUD();
 
     // === JUGADORES ===
@@ -351,24 +356,24 @@ void gameLoop(void) {
  * Checa si alguno de los ESP32 mando el comando 'P'.
  * Se lee I2C de ambos jugadores.
  */
-static uint8_t checarComandoPlay(void) {
-    uint8_t cmd = CMD_NONE;
-    if (hi2c1.State != HAL_I2C_STATE_READY) {
-        __HAL_I2C_DISABLE(&hi2c1); HAL_Delay(1);
-        __HAL_I2C_ENABLE(&hi2c1);
-        hi2c1.State = HAL_I2C_STATE_READY; hi2c1.Lock = HAL_UNLOCKED;
-    }
-    // Checar J1
-    if (HAL_I2C_Master_Receive(&hi2c1, ESP32_J1_ADDR, &cmd, 1, 50) == HAL_OK) {
-        if (cmd == CMD_PLAY) return 1;
-    }
-    // Checar J2
-    cmd = CMD_NONE;
-    if (HAL_I2C_Master_Receive(&hi2c1, ESP32_J2_ADDR, &cmd, 1, 50) == HAL_OK) {
-        if (cmd == CMD_PLAY || cmd == 'p') return 1;
-    }
-    return 0;
-}
+//static uint8_t checarComandoPlay(void) {
+//    uint8_t cmd = CMD_NONE;
+//    if (hi2c1.State != HAL_I2C_STATE_READY) {
+//        __HAL_I2C_DISABLE(&hi2c1); HAL_Delay(1);
+//        __HAL_I2C_ENABLE(&hi2c1);
+//        hi2c1.State = HAL_I2C_STATE_READY; hi2c1.Lock = HAL_UNLOCKED;
+//    }
+//    // Checar J1
+//    if (HAL_I2C_Master_Receive(&hi2c1, ESP32_J1_ADDR, &cmd, 1, 50) == HAL_OK) {
+//        if (cmd == CMD_PLAY) return 1;
+//    }
+//    // Checar J2
+//    cmd = CMD_NONE;
+//    if (HAL_I2C_Master_Receive(&hi2c1, ESP32_J2_ADDR, &cmd, 1, 50) == HAL_OK) {
+//        if (cmd == CMD_PLAY || cmd == 'p') return 1;
+//    }
+//    return 0;
+//}
 
 /* USER CODE END 0 */
 
@@ -402,10 +407,10 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI1_Init();
-  MX_I2C1_Init();
   MX_FATFS_Init();
   MX_USART2_UART_Init();
   MX_TIM6_Init();
+  MX_UART4_Init();
   /* USER CODE BEGIN 2 */
     transmit_uart("\r\n--- REINICIO DEL SISTEMA ---\r\n");
 
@@ -420,22 +425,10 @@ int main(void)
     mount_SD();
     unmount_SD();
 
-    // Debug I2C
-    char pinDbg[60];
-    uint8_t sda = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_7);
-    uint8_t scl = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6);
-    sprintf(pinDbg, "I2C pins: SDA=%d SCL=%d\r\n", sda, scl);
-    transmit_uart(pinDbg);
 
-    transmit_uart("Escaneando bus I2C...\r\n");
-    for (uint8_t addr = 1; addr < 128; addr++) {
-        if (HAL_I2C_IsDeviceReady(&hi2c1, addr << 1, 1, 10) == HAL_OK) {
-            char buf[40]; sprintf(buf, "  Encontrado: 0x%02X\r\n", addr); transmit_uart(buf);
-        }
-    }
-    transmit_uart("Escaneo terminado.\r\n");
 
     estadoJuego = ESTADO_START;
+    //estadoJuego = ESTADO_PLAYING;
     estadoPintado = 0;
 
     /*----------------- PRUEBA ESCENAS -----------------*/
@@ -458,7 +451,8 @@ int main(void)
 //    drawImageSD_Chunked("game_over.bin", 0, 0, 240, 320, 9);
 //    drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
 //    HAL_Delay(1000);
-
+    HAL_UART_Receive_IT(&huart4, &uart4_rx, 1);
+    HAL_TIM_Base_Start_IT(&htim6);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -497,8 +491,8 @@ int main(void)
         	  // ---------- Animacion MENU START
         	  frame_start = (numFrame/2)%2; 	//XOR
         	  LCD_Sprite(76, 130, 88, 7, insert_coin, 2, frame_start, 0, 0);
-        	  frame_start = (numFrame/2)%4;
-        	  LCD_Sprite(111, 33, 18, 24, peach, 4, frame_start, 0, 0);
+        	  //frame_start = (numFrame/2)%4;
+        	  //LCD_Sprite(111, 33, 18, 24, peach, 4, frame_start, 0, 0);
         	  // ------ CONDICIÓN DE PARPADEO ---------
         	  if (mario_ready) LCD_Sprite(146, 188, 39, 7, mario_start, 2, 0, 0, 0);
         	  else LCD_Sprite(146, 188, 39, 7, mario_start, 2, frame_start, 0, 0);
@@ -513,8 +507,9 @@ int main(void)
               transmit_uart("Estado: PLAYING\r\n");
           }
           break;
-
+//IMPORTANTE BORRAR INICIAR JUEGO DE ESTADO_PLAYING
       case ESTADO_PLAYING:
+    	  //iniciarJuego();
           gameLoop();
           // estadoJuego puede cambiar a GAME_OVER dentro de Fisicas_Update
           if (estadoJuego == ESTADO_GAME_OVER) {
@@ -602,40 +597,6 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C1_Init(void)
-{
-
-  /* USER CODE BEGIN I2C1_Init 0 */
-
-  /* USER CODE END I2C1_Init 0 */
-
-  /* USER CODE BEGIN I2C1_Init 1 */
-
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C1_Init 2 */
-
-  /* USER CODE END I2C1_Init 2 */
-
-}
-
-/**
   * @brief SPI1 Initialization Function
   * @param None
   * @retval None
@@ -708,6 +669,38 @@ static void MX_TIM6_Init(void)
   /* USER CODE BEGIN TIM6_Init 2 */
 
   /* USER CODE END TIM6_Init 2 */
+
+}
+
+/**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 115200;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+  /* USER CODE END UART4_Init 2 */
 
 }
 
@@ -824,7 +817,37 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == UART4) {
 
+        if (uart4_rx == CMD_PLAY || uart4_rx == 'p') {
+            cRecibido = 1;
+        }
+        // Si es Mayúscula, es de Mario (J1)
+        else if (uart4_rx >= 'A' && uart4_rx <= 'Z') {
+            estado_J1 = uart4_rx;
+        }
+        // Si es Minúscula, es de Luigi (J2)
+        else if (uart4_rx >= 'a' && uart4_rx <= 'z') {
+            estado_J2 = uart4_rx;
+        }
+
+        // Reactivamos interrupción
+        HAL_UART_Receive_IT(&huart4, &uart4_rx, 1);
+    }
+}
+static uint8_t checarComandoPlay(void) {
+    // ¿El Callback nos avisó que llegó una 'P' o 'p'?
+    if (cRecibido == 1) {
+        cRecibido = 0; // Apagamos la alarma
+
+        // ---> DEBUGGER SEGURO <---
+        transmit_uart("UART4 RX -> ¡Comando PLAY recibido por Interrupcion!\r\n");
+
+        return 1; // Le decimos al main que arranque el juego
+    }
+    return 0; // Si no hay nada, no hacemos nada
+}
 /* USER CODE END 4 */
 
 /**
