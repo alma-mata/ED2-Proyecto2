@@ -85,11 +85,11 @@ uint8_t luigi_listo = 0;
 volatile uint8_t contador_frames = 0;
 uint8_t buffer_uart4;
 volatile uint8_t bandera_play = 0;
-volatile uint8_t bandera_skip = 0; // NUEVA BANDERA: Para saltar la cinematica
+volatile uint8_t bandera_skip = 0;
 volatile uint8_t estado_J1 = 'N';
 volatile uint8_t estado_J2 = 'n';
 
-/* Animación de DK y Peach - (peachFrame ahora es fijo 0) */
+
 uint8_t frame_princesa = 0;
 /* USER CODE END PV */
 
@@ -111,7 +111,6 @@ void iniciarJuego(void);
 void dibujarDK(void);
 void dibujarPeach(void);
 static uint8_t revisar_boton_play(void);
-/* NUEVA FUNCION: Para la cinematica */
 uint8_t drawImageSD_Chunked_Skip(char *filename, uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t total_frames);
 /* USER CODE END PFP */
 
@@ -292,14 +291,26 @@ static uint8_t spritesOverlap(int16_t x1, int16_t y1,
     return 1;
 }
 
-/* ========== DK: CORREGIDO ORIENTACIÓN ========== */
 void dibujarDK(void) {
     int16_t dy = 0;
-    if (dkTirando > DK_THROW_FRAMES / 2) {
-        dy = -4;
+    uint8_t frame_actual_dk = 0;
+
+
+    if (dkTirando > 0) {
+        if (dkTirando > DK_THROW_FRAMES / 2) {
+            dy = -4;
+            frame_actual_dk = 2;
+        } else {
+            frame_actual_dk = 1;
+        }
+    } else {
+        frame_actual_dk = 0;
     }
-    LCD_Sprite(DK_X, DK_Y + dy, DK_W, DK_H, (const uint16_t*)DK_2, 1, 0, 0, 0);
+
+
+    LCD_Sprite_Transparent(DK_X, DK_Y + dy, DK_W, DK_H, (const uint16_t*)DK_2, 3, frame_actual_dk, 0, 0, 0x0000);
 }
+
 
 /* ========== Peach: SIN ANIMACIÓN (Fija) ========== */
 void dibujarPeach(void) {
@@ -531,9 +542,9 @@ int main(void)
           else LCD_Sprite(146, 233, 39, 7, luigi_start, 2, frame_inicial, 0, 0);
 
           if (revisar_boton_play()) {
-              // Pasamos al estado de cinematica en vez de ir a PLAYING de una vez
+
               pantalla_actualizada = 0;
-              estadoJuego = 5; // Usamos 5 como valor temporal para ESTADO_CINEMATICA
+              estadoJuego = 5;
           }
           break;
 
