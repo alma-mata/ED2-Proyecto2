@@ -235,7 +235,7 @@ void dibujarMapa(void) {
         for (uint8_t col = 0; col < MAP_COLS; col++) {
             uint16_t px = col * TILE_W;
             uint16_t py = row * TILE_H;
-            int16_t offset = calcularOffsetInclinacion(row, col);
+            int16_t offset = calc_slope(row, col);
             uint8_t blk = tilemap[row][col];
             if (blk == 1)
                 LCD_BitmapTransparent(px, py+offset, 16, 8, (const uint16_t*)tile2, 0x0000);
@@ -267,7 +267,7 @@ void repararTiles(int16_t x, int16_t y, uint8_t w, uint8_t h) {
             if (r < 0 || r >= MAP_ROWS || c < 0 || c >= MAP_COLS) continue;
             uint16_t tpx = c * TILE_W;
             uint16_t tpy = r * TILE_H;
-            int16_t offset = calcularOffsetInclinacion(r, c);
+            int16_t offset = calc_slope(r, c);
             uint8_t blk = tilemap[r][c];
             if (blk == 1)
                 LCD_Bitmap(tpx, tpy+offset, 16, 8, (const uint16_t*)tile2);
@@ -296,8 +296,8 @@ void dibujarDK(void) {
     uint8_t frame_actual_dk = 0;
 
 
-    if (dkTirando > 0) {
-        if (dkTirando > DK_THROW_FRAMES / 2) {
+    if (dk_anim > 0) {
+        if (dk_anim > DK_THROW_FRAMES / 2) {
             dy = -4;
             frame_actual_dk = 2;
         } else {
@@ -452,8 +452,8 @@ void gameLoop(void) {
     {
         static uint8_t fase_dk_anterior = 0;
         uint8_t fase_actual_dk = 0;
-        if (dkTirando > DK_THROW_FRAMES / 2) fase_actual_dk = 2;
-        else if (dkTirando > 0)              fase_actual_dk = 1;
+        if (dk_anim > DK_THROW_FRAMES / 2) fase_actual_dk = 2;
+        else if (dk_anim > 0)              fase_actual_dk = 1;
 
         if (fase_actual_dk != fase_dk_anterior) {
             borrarSprite(DK_X, DK_Y - 4, DK_W, DK_H + 4);
@@ -621,7 +621,7 @@ int main(void)
               drawImageSD_Chunked("win.bin", 0, 0, 240, 320, 8);
               drawImageSD_Chunked("score.bin", 0, 0, 240, 320, 1);
 
-              if (ganadorID == J_MARIO) {
+              if (winner == J_MARIO) {
                   LCD_Print("WIN", 140, 135, 2, 0x07E0, 0x0000);
                   LCD_Print("LOSE", 140, 195, 2, 0xF800, 0x0000);
               } else {
@@ -840,18 +840,7 @@ void Error_Handler(void)
 }
 
 #ifdef USE_FULL_ASSERT
-/**
-  * @brief  Reports the name of the source file and the source line number
-  * where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
 void assert_failed(uint8_t *file, uint32_t line)
 {
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
