@@ -27,13 +27,13 @@
 #define BLOQUE_ESCALERA_SOLIDO 3
 #define BLOQUE_PELIGRO         4
 
-// fixed point 24.8 - para tener precision subpixel sin usar float
+// fixed point 24.8 - para tener precision subpixel sin usar float (AYUDA DE CHAT_GPT)
 #define FP_SHIFT        8
 #define PX_TO_FP(px)    ((int32_t)(px) << FP_SHIFT)
 #define FP_TO_PX(fp)    ((int32_t)(fp) >> FP_SHIFT)
 
 // constantes de movimiento (en fixed point)
-// estos valores los calibre a ojo hasta q se sintio bien
+
 #define GRAVEDAD        50
 #define VEL_SALTO       (-800)
 #define VEL_CAMINAR     384
@@ -66,7 +66,8 @@ typedef enum {
     ESTADO_PLAYING,
     ESTADO_GAME_OVER,
     ESTADO_WIN,
-    ESTADO_RESET
+    ESTADO_RESET,
+	SALTAR_CINE
 } EstadoJuego_t;
 
 // comandos UART (los mismos q usa el modulo de sonido)
@@ -116,7 +117,6 @@ extern EstadoJuego_t estadoJuego;
 extern uint8_t dk_anim;
 extern uint8_t winner;
 
-// --- API publica ---
 // el resto de funciones son static en el .c, no se exponen
 void Fisicas_Init(void);
 void Fisicas_Update(void);

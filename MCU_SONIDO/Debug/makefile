@@ -60,8 +60,8 @@ all: main-build
 main-build: MCU_SONIDO.elf secondary-outputs
 
 # Tool invocations
-MCU_SONIDO.elf MCU_SONIDO.map: $(OBJS) $(USER_OBJS) C:\Users\itzle\Documents\GitHub\DIGITAL_2\LABORATORIO_9\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "MCU_SONIDO.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\itzle\Documents\GitHub\DIGITAL_2\LABORATORIO_9\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="MCU_SONIDO.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+MCU_SONIDO.elf MCU_SONIDO.map: $(OBJS) $(USER_OBJS) C:\Users\itzle\Documents\GitHub\ED2-Proyecto2\MCU_SONIDO\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "MCU_SONIDO.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\itzle\Documents\GitHub\ED2-Proyecto2\MCU_SONIDO\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="MCU_SONIDO.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

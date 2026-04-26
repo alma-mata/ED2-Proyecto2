@@ -51,7 +51,7 @@ const uint8_t tilemap[20][30] = {
 /* ---- utilidades de mapa ---- */
 
 // las plataformas tienen una inclinacion leve como en el DK original
-// dividimos col/4 para que sea sutil, si pones /3 se ve muy exagerado
+// dividimos col/4 para que sea sutil(ayuda de chat_gpt)
 int16_t calc_slope(uint8_t row, uint8_t col)
 {
     if(row >= 18 || row <= 3) return 0;
@@ -134,6 +134,7 @@ void Fisicas_Init(void)
 
 /* ---- fisicas del jugador ---- */
 
+// Información obtendia de fotos y chat gpt
 static void do_gravity(Jugador_t *j) {
     if(j->enEscalera) return;
     j->velY += GRAVEDAD;
@@ -147,7 +148,7 @@ static void do_floor_col(Jugador_t *j)
 
     if(j->velY >= 0)
     {
-        // verificar con 2 puntos (pie izq y der) para que no se caiga por las orillas
+        // verificar con 2 puntos para que no se caiga por bordes
         int16_t feetY = FP_TO_PX(j->y) + j->h;
         int16_t nextFeetY = FP_TO_PX(j->y + j->velY) + j->h;
         int16_t s1 = get_floor(px+4, feetY);
@@ -156,17 +157,27 @@ static void do_floor_col(Jugador_t *j)
 
         if(suelo<400 && nextFeetY>=suelo) {
             j->y = PX_TO_FP(suelo - j->h);
-            j->velY=0; j->enSuelo=1; j->saltando=0;
-        } else {
+            j->velY=0;
+            j->enSuelo=1;
+            j->saltando=0;
+        }
+        else
+        {
             j->y += j->velY;
         }
-    } else {
+    }
+    else
+    {
         j->y += j->velY;
     }
 
     // clamp pantalla
-    if(FP_TO_PX(j->y) < 0) { j->y=0; j->velY=0; }
-    if(FP_TO_PX(j->y)+j->h > SCREEN_H) {
+    if(FP_TO_PX(j->y) < 0)
+    {
+    	j->y=0; j->velY=0;
+    }
+    if(FP_TO_PX(j->y)+j->h > SCREEN_H)
+    {
         j->y = PX_TO_FP(SCREEN_H - j->h);
         j->velY=0; j->enSuelo=1;
     }
@@ -246,7 +257,7 @@ static void spawn_barril(void)
 {
     for(uint8_t i=0; i<MAX_ENEMIGOS; i++){
         if(enemigos[i].activo) continue;
-        // sale de donde esta DK (tile 5,5 aprox)
+        // sale de donde esta DK
         int16_t sx = 5*TILE_W;
         int16_t sy = 5*TILE_H - BARRIL_H + calc_slope(5,5);
         Enemigo_t *e = &enemigos[i];

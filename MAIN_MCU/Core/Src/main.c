@@ -549,26 +549,24 @@ int main(void)
           break;
 
       // --- NUEVO ESTADO: CINEMATICA (ESTADO_JUEGO = 5) ---
-      case 5:
+      case SALTAR_CINE:
           if (!pantalla_actualizada) {
               LCD_Clear(0x0000);
               bandera_skip = 0; // Reiniciamos la bandera
 
-              transmit_uart("Reproduciendo Cinematica (start_animation.bin)...\r\n");
 
               // Reproducimos la animacion, guardamos si el usuario la skipeo
               uint8_t se_salto = drawImageSD_Chunked_Skip("start_animation.bin", 0, 0, 240, 320, 22);
 
               if (se_salto) {
-                  transmit_uart("Cinematica saltada con 'T'\r\n");
 
                   // Avisamos al sonido y entramos al juego
                   uint8_t cmd_jugar = 'P';
                   HAL_UART_Transmit(&huart2, &cmd_jugar, 1, 10);
                   iniciarJuego();
-                  transmit_uart("Estado: PLAYING\r\n");
+
               } else {
-                  transmit_uart("Cinematica terminada. Regresando a Menu.\r\n");
+
                   estadoJuego = ESTADO_START;
               }
 
@@ -597,7 +595,7 @@ int main(void)
               LCD_Print("LOSE", 140, 195, 2, 0xF800, 0x0000);
               LCD_Print("PRESS P TO RESTART", 20, 280, 1, 0xFFFF, 0x0000);
 
-              transmit_uart("Estado: GAME_OVER - esperando P\r\n");
+
               pantalla_actualizada = 1;
           }
           if (revisar_boton_play()) {
@@ -631,7 +629,7 @@ int main(void)
 
               LCD_Print("PRESS P TO RESTART", 20, 280, 1, 0xFFFF, 0x0000);
 
-              transmit_uart("Fin del juego. Ganador registrado.\r\n");
+
               pantalla_actualizada = 1;
           }
 
